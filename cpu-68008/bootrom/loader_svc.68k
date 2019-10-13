@@ -1,0 +1,242 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Loader services
+;
+; All services return a status code in d0. 0 for success, negative for error.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 00 - Does nothing
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_NoOp:
+  moveq   #0, d0
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 01 - Writes a byte buffer to the specified UART.
+;
+; NOTE: This does NOT handle zero-terminated strings by default.
+;
+; INPUTS:
+;   a1: Buffer to read from
+;   d1: Number of bytes to write (high word) and UART number (low word)
+; OUTPUTS:
+;   d0: Error code (negative) or bytes written (> 0)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_UartOut:
+  ; back up registers
+  move.l  d2, -(sp)
+
+  ; is the UART number in range?
+  cmp.w   #2, d1
+  bge.s   .UartNumOutOfRange
+
+  ; length should be nonzero
+  swap    d1
+  tst.w   d1
+  beq.s   .InvalidLength
+  swap    d1
+
+  ; write to the appropriate UART
+  move.l  a1, a0
+  move.l  d1, d0
+  bsr.w   MC68681_UartTx
+
+.Done:
+  ; Restore registers
+  move.l  d2, (sp)+
+
+  rts
+
+.UartNumOutOfRange:
+  moveq   #-2, d0
+  bra.s   .Done
+.InvalidLength:
+  moveq   #-1, d0
+  bra.s   .Done
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 02 - Reads a byte buffer from the specified UART.
+;
+; INPUTS:
+;   a1: Buffer to read data to
+;   d1: Number of bytes to read (high word) and UART number (low word)
+; OUTPUTS:
+;   d0: Error code (negative) or bytes read (> 0)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_UartIn:
+  ; back up registers
+  movem.l  d2-d3, -(sp)
+
+  ; is the UART number in range?
+  cmp.w   #2, d1
+  bge.s   .UartNumOutOfRange
+
+  ; length should be nonzero
+  swap    d1
+  tst.w   d1
+  beq.s   .InvalidLength
+  swap    d1
+
+  ; read from the appropriate UART
+  move.l  a1, a0
+  move.l  d1, d0
+  bsr.w   MC68681_UartRx
+
+  ; reformat return code d0
+  swap    d0
+  tst.w   d0
+  bne.s   .NoError
+
+  ; there were errors. extract them
+  moveq   #0, d2
+  swap    d0
+  and.w   d2, d0
+  swap    d0
+  neg.l   d0
+
+  bra.s   .Done
+
+.NoError:
+  ; nothing needs to be done, we're good
+  nop
+
+.Done:
+  ; restore registers
+  movem.l  (sp)+, d2-d3
+  rts
+
+.UartNumOutOfRange:
+  moveq   #-2, d0
+  bra.s   .Done
+.InvalidLength:
+  moveq   #-1, d0
+  bra.s   .Done
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 03 - Waits for a certain period of time.
+;
+; INPUTS:
+;   d1: How long to delay for, in 1/100ths of a second.
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Delay:
+  ; TODO: implement
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 04 - Reads the input lines on the 68681.
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   d0: State of IO lines: bit 0 is IP0, bit 1 is IP1, and so forth.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_ReadIO:
+  ; update state from hardware
+  bsr.w   MC68681_UpdateInput
+
+  ; read port state
+  move.b  (Loader_68681In), d0
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 05 - Sets the state of the output lines on the 68681.
+;
+; INPUTS:
+;   d1: Which pins to set low (high word) and which to set high (low word). If
+;       the same pin is set to be both low and high, an error is returned.
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_WriteIO:
+  ; back up registers
+  move.l  d2, -(sp)
+
+  ; check that no pins are specified twice
+  moveq   #0, d2
+  move.w  d1, d2
+  swap    d1
+  and.w   d1, d2
+  bne.s   .Invalid
+
+  ; bits to clear are in the low word of d1, so AND against its inverse
+  not.w   d1
+  and.b   d1, (Loader_68681Out)
+
+  ; extract bits to set high (high word of d1)
+  move.w  d1, d2
+  swap    d1
+  and.w   #$00FF, d1
+
+  ; we now have the bits to set in the low byte of d1, so OR into memory state
+  or.b    d1, (Loader_68681Out)
+
+  ; actually update output
+  bsr.w   MC68681_UpdateOutput
+  moveq   #0, d0
+
+.Done:
+  ; Restore registers
+  move.l  (sp)+, d2
+  rts
+
+.Invalid:
+  moveq   #-1, d0
+  bra.s   .Done
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 06 - Reads the RTC and updates the in memory date/time variables.
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_ReadRtc:
+  ; back up registers
+  movem.l d0/d2-d3/a1, -(sp)
+
+  bsr.w   RTC_Read
+
+  ; restore registers
+  movem.l (sp)+, d0/d2-d3/a1
+  moveq   #0, d0
+
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 07 - Writes to the RTC the values in the memory date/time variables.
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_WriteRtc:
+  ; back up registers
+  movem.l d0/d2-d3/a1, -(sp)
+
+  bsr.w   RTC_Write
+
+  ; restore registers
+  movem.l (sp)+, d0/d2-d3/a1
+  moveq   #0, d0
+
+  rts

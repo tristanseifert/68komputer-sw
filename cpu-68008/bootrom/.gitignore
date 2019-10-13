@@ -1,0 +1,8 @@
+# built ROM files
+bootrom.bin
+bootrom.lst
+
+rom.bin
+
+# other build artefacts
+builddate.txt
