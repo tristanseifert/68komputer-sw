@@ -101,9 +101,16 @@ Exception_Handle:
   ; disable all interrupts
   move  $2700, sr
 
+  ; set both status LEDs on
+  movem.l d0/a0, -(sp)
+  or.b    #%10001000, (Loader_68681Out)
+  bsr.w   MC68681_UpdateOutput
+  movem.l (sp)+, d0/a0
+
+.Loop:
   ; wait lol
   nop
-  bra.s Exception_Handle
+  bra.s .Loop
 
 ; enter the monitor from a trap
 Trap_EnterMonitor:
@@ -187,6 +194,11 @@ EntryPoint:
   ; disable all interrupts
   move    #$2700, sr
 
+  ; is this a warm boot? if so, skip RAM clearing
+  cmp.l   #$DEADBEEF, (RAM_BootFlag)
+  beq.s   .warmBoot
+
+.coldBoot:
   ; clear all RAM
   lea     (RAM_Base), a0
   move.l  #(RAM_Size/4)-1, d1
@@ -195,6 +207,17 @@ EntryPoint:
   move.l  d0, (a0)+
   dbf     d1, .clear
 
+  ; set 'memory has been cleared'/warm boot flag
+  move.l  #$DEADBEEF, (RAM_BootFlag)
+
+  bra.s   .continueBoot
+
+  ; handle warm boot specific stuff
+.warmBoot:
+  ; set the 'reset reason' flag
+  move.b  #$01, (RAM_Reset_Reason)
+
+.continueBoot:
   ; initialize IRQ vectors
   move.l  #IRQ_Unused, d0
 
@@ -251,13 +274,13 @@ Loader_RunApp:
   moveq   #0, d2
 
 .ChecksumLoop:
-  move.b  (a1)+, d2
-  add.l   d2, d0
-  dbf     d1, .ChecksumLoop
+  ; move.b  (a1)+, d2
+  ; add.l   d2, d0
+  ; dbf     d1, .ChecksumLoop
 
   ; compare it against what's expected
-  cmp.l   (a0)+, d0
-  bne.s   .InvalidChecksum
+  ; cmp.l   (a0)+, d0
+  ; bne.s   .InvalidChecksum
 
   ; if we get here, the header is valid, so jump to the app
   move.l  (a0)+, d0
@@ -328,6 +351,8 @@ Loader_Menu:
   bsr.w   Loader_Menu_PrintError
   bra.s   .MainLoop
 
+
+
 .CheckRAMApp:
   cmp.b   #'2', d0
   bne.s   .CheckDownload
@@ -341,13 +366,17 @@ Loader_Menu:
   bsr.w   Loader_Menu_PrintError
   bra.s   .MainLoop
 
+
+
 .CheckDownload:
   cmp.b   #'3', d0
   bne.s   .CheckMonitor
 
   ; enter download subroutine
-  ; XXX: todo
+  bsr.w   UartLoader_Start
   bra.s   .MainLoop
+
+
 
 .CheckMonitor:
   cmp.b   #'4', d0
@@ -356,6 +385,8 @@ Loader_Menu:
   ; enter monitor
   ; XXX: todo
   bra.s   .MainLoop
+
+
 
 .InvalidOption:
   ; there was an invalid selection
@@ -369,7 +400,9 @@ Loader_Menu:
   bsr.w   MC68681_UartTx
 
   ; repeat main loop
-  bra.s   .MainLoop
+  bra.w   .MainLoop
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Prints an error code (in d0) with the description string in a0, similar to
@@ -444,7 +477,7 @@ Loader_Menu_Text:
   even
 
 Loader_Menu_Invalid:
-  dc.b    "Invalid selection", $0A, 0
+  dc.b    "Invalid selection!", $0A, $0A, 0
   even
 
 Loader_Menu_ErrRunApp:
@@ -472,6 +505,10 @@ Loader_Handle_Tick:
 ; Hardware helper routines
 	include	"68681.68k"
   include "rtc.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Helper routines
+  include "uart_loader.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Loader services

@@ -4,11 +4,20 @@
 ; Start all our variables in the first 4K of RAM (stack occupies the bottom K)
 RAM_Base_App_Real           = RAM_Base
 
+; warm boot flag
+RAM_BootFlag                = RAM_Base_App_Real
+; reset reason (byte; $00 = cold boot, $01 = warm boot)
+RAM_Reset_Reason            = (RAM_BootFlag + $4)
 ; Current mode (byte)
-RAM_Mode                    = RAM_Base_App_Real
+RAM_Mode                    = (RAM_Reset_Reason + $1)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Scratch buffers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RAM_Scratch                 = (RAM_Base_App_Real+$10)
 RAM_Scratch_Len             = $40
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; UART loader ($200 bytes)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+UartLoader_Base             = (RAM_Scratch+RAM_Scratch_Len)
