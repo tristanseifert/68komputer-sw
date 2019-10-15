@@ -234,7 +234,7 @@ EntryPoint:
   bsr.w   RTC_Reset
 
   ; enter loader menu
-  bra.w   Loader_Menu
+  bra.w   Menu_Entry
 
   ; TODO: do stuff here, lmfao
   nop
@@ -302,189 +302,6 @@ Loader_RunApp:
   moveq   #-3, d0
   rts
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Enters the loader main menu.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Loader_Menu:
-  ; we need interrupts on
-  move    #$2200, sr
-
-  ; set the on-board LEDs (OP3 = STATUS0 and OP7 = STATUS1)
-  move.b  #%00001000, (Loader_68681Out)
-  bsr.w   MC68681_UpdateOutput
-
-.MainLoop:
-  ; print message
-  lea     Loader_Menu_Text(pc), a0
-  bsr.w   lib_strlen
-
-  swap    d0
-  move.w  #0, d0
-
-  lea     Loader_Menu_Text(pc), a0
-  bsr.w   MC68681_UartTx
-
-  ; attempt to receive response
-  bsr.w   MC68681_UartRxChar
-  swap    d0
-  tst.w   d0
-  beq.s   .CheckResponse
-
-  ; there was an error
-  ; todo: handle it
-  bra.s   .MainLoop
-
-.CheckResponse:
-  ; we need to get the character into the low word again
-  swap    d0
-
-  ; start ROM app?
-  cmp.b   #'1', d0
-  bne.s   .CheckRAMApp
-
-  ; start app in ROM at $008000
-  lea     ROM_App_Base, a0
-  bsr.w   Loader_RunApp
-
-  ; if we get here, d0 will contain an error code
-  lea     Loader_Menu_ErrRunApp(pc), a0
-  bsr.w   Loader_Menu_PrintError
-  bra.s   .MainLoop
-
-
-
-.CheckRAMApp:
-  cmp.b   #'2', d0
-  bne.s   .CheckDownload
-
-  ; start app in RAM at $088000
-  lea     $088000, a0
-  bsr.w   Loader_RunApp
-
-  ; if we get here, d0 will contain an error code
-  lea     Loader_Menu_ErrRunApp(pc), a0
-  bsr.w   Loader_Menu_PrintError
-  bra.s   .MainLoop
-
-
-
-.CheckDownload:
-  cmp.b   #'3', d0
-  bne.s   .CheckMonitor
-
-  ; enter download subroutine
-  bsr.w   UartLoader_Start
-  bra.s   .MainLoop
-
-
-
-.CheckMonitor:
-  cmp.b   #'4', d0
-  bne.s   .InvalidOption
-
-  ; enter monitor
-  ; XXX: todo
-  bra.s   .MainLoop
-
-
-
-.InvalidOption:
-  ; there was an invalid selection
-  lea     Loader_Menu_Invalid(pc), a0
-  bsr.w   lib_strlen
-
-  swap    d0
-  move.w  #0, d0
-
-  lea     Loader_Menu_Invalid(pc), a0
-  bsr.w   MC68681_UartTx
-
-  ; repeat main loop
-  bra.w   .MainLoop
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Prints an error code (in d0) with the description string in a0, similar to
-; perror().
-;
-; INPUTS:
-;   d0: error code
-;   a0: description string (zero terminated)
-; OUTPUTS:
-;   None
-; CLOBBERS:
-;   d0-d2, a0-a1
-;
-Loader_Menu_PrintError:
-  ; save the error code for later
-  move.l  d0, -(sp)
-
-  ; first, print the description string
-  move.l  a0, a1
-  bsr.w   lib_strlen
-
-  swap    d0
-  move.w  #0, d0
-
-  move.l  a1, a0
-  bsr.w   MC68681_UartTx
-
-  ; print a colon
-  moveq   #2, d0
-  swap    d0
-  lea     .Colon(pc), a0
-  bsr.w   MC68681_UartTx
-
-  ; now, get the error code and print it in hex
-  move.l  (sp)+, d0
-  lea     (Loader_Uart_Rx_Buffer), a0
-  bsr.w   lib_dectohex
-
-  moveq   #8, d0
-  swap    d0
-  lea     (Loader_Uart_Rx_Buffer), a0
-  bsr.w   MC68681_UartTx
-  ; bra.w   MC68681_UartTx
-
-  ; also, a newline
-  moveq   #2, d0
-  swap    d0
-  lea     .Newline(pc), a0
-  bra.w   MC68681_UartTx
-  ; bsr.w   MC68681_UartTx
-
-  ; done!
-.Done:
-  rts
-
-.Colon:
-  dc.b    ": ", 0
-  even
-.Newline:
-  dc.b    " ", $0A, 0
-  even
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Loader_Menu_Text:
-  dc.b    "68komputer Loader Menu", $0A
-  dc.b    "Select an option", $0A
-  dc.b    "1) Start ROM app from $008000", $0A
-  dc.b    "2) Start RAM app from $088000", $0A
-  dc.b    "3) Download to RAM", $0A
-  dc.b    "4) Enter monitor", $0A
-  dc.b    "> ", 0
-  even
-
-Loader_Menu_Invalid:
-  dc.b    "Invalid selection!", $0A, $0A, 0
-  even
-
-Loader_Menu_ErrRunApp:
-  dc.b    "Error starting app", 0
-  even
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Loader tick function, this should be called periodically at 50Hz.
@@ -498,39 +315,21 @@ Loader_Handle_Tick:
   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Components of the bootloader
+  include "menu.68k"
+  include "uart_loader.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; library type routines
   include "lib.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Hardware helper routines
+; Hardware support
 	include	"68681.68k"
   include "rtc.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Helper routines
-  include "uart_loader.68k"
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Loader services
-Svc_Table:
-  ; 00: no-op
-  dc.w    Svc_NoOp-Svc_Table
-  ; 01: write bytes to UART
-  dc.w    Svc_UartOut-Svc_Table
-  ; 02: read bytes from UART
-  dc.w    Svc_UartIn-Svc_Table
-  ; 03: Delay program
-  dc.w    Svc_Delay-Svc_Table
-  ; 04: Get input state
-  dc.w    Svc_ReadIO-Svc_Table
-  ; 05: Set output state
-  dc.w    Svc_WriteIO-Svc_Table
-  ; 06: Read RTC
-  dc.w    Svc_ReadRtc-Svc_Table
-  ; 07: Write RTC
-  dc.w    Svc_WriteRtc-Svc_Table
-Svc_Table_End:
-
   include "loader_svc.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
