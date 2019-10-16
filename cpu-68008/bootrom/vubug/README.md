@@ -1,0 +1,1 @@
+This directory contains a copy of the source to the VUBUG 68k monitor ((source)[http://www.easy68k.com/paulrsm/src/vubug.txt]) by Edward M. Carter and Russell G. Brown. This is the monitor we put into the boot ROM :)

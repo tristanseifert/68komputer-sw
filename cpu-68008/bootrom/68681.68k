@@ -540,4 +540,4 @@ MC68681_ISR:
 
 .done:
   move.l  (sp)+, d0
-  rte
+  rts

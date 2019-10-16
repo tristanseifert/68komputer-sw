@@ -34,10 +34,12 @@ Bus_Periph_Size             = $040000
 RAM_Base                    = $080000
 RAM_Size                    = $080000
 
-; base address for loader
-RAM_Loader                  = RAM_Base
+; base address for monitor (2KBytes reserved)
+RAM_Monitor                 = (RAM_Base)
+; base address for loader (4KBytes reserved)
+RAM_Loader                  = (RAM_Monitor+$800)
 ; base address for app variables
-RAM_Base_App                = (RAM_Base+$1000)
+RAM_Base_App                = (RAM_Loader+$1000)
 
 ; the last $200 bytes of RAM ($80000 - $FFFFF) are reserved as stack
 RAM_Stack_Base              = RAM_Base + RAM_Size
