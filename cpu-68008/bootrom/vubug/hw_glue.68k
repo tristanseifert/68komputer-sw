@@ -7,7 +7,7 @@
 ; receive/transmit.
 VUBUG_MC68681_ISR:
   ; save regs
-  move.l  d0, -(sp)
+  movem.l d0-d1, -(sp)
 
   ; read ISR state
   move.b  (MC68681_Base+MC68681_R_ISR), d0
@@ -42,7 +42,7 @@ VUBUG_MC68681_ISR:
 
   ; done, clean up
 .done:
-  move.l  (sp)+, d0
+  movem.l (sp)+, d0-d1
   rts
 
 
@@ -51,7 +51,42 @@ VUBUG_MC68681_ISR:
 VUBUG_MC68681_ISR_ChA_Rx:
   ; read byte
   move.b  (MC68681_Base+MC68681_R_RHRA), d0
+
+  ; did we receive a Ctrl+C?
+  cmp.b   #$03, d0
+  beq     .CtrlC
+  ; did we receive Ctrl+S?
+  cmp.b   #$13, d0
+  beq     .CtrlS
+  ; did we receive Ctrl+Q?
+  cmp.b   #$11, d0
+  beq     .CtrlQ
+
+  ; if we get here, we should stuff the received byte into the queue
+  lea     (UART_A_Queue), a0
+  bsr     VUBUG_MC68681_ISR_Push
+
+  ; is echo turned on?
+  btst    #0, echo
+  beq.s   .Done
+
+  bra     writ
+
+.Done:
   rts
+
+; Handle Ctrl+S: we set a flag and terminat
+.CtrlS:
+  move.b  #$1, ctrls
+  bra     .Done
+; Handle Ctrl+Q: clear the control flag and exit
+.CtrlQ:
+  move.b  #$00, ctrls
+  bra     .Done
+
+; Handle Ctrl+C: TODO (should return to prompt)
+.CtrlC:
+  bra     .Done
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Reads the data from the Channel B register and adds it to the receive queue
@@ -59,10 +94,40 @@ VUBUG_MC68681_ISR_ChB_Rx:
   ; read byte
   move.b  (MC68681_Base+MC68681_R_RHRB), d0
 
-  ; just add it to the queue as is. nothing fancy to do for channel B
+  ; add the byte to the queue
+  lea     (UART_B_Queue), a0
+  bra     VUBUG_MC68681_ISR_Push
+
+.Done:
   rts
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Pushes the byte character in d0 into the queue whose header is in a0.
+;
+; TODO: The carry flag is set if the queue did not have space available.
+;
+; Clobbers:
+;   d0, a0, d1
+VUBUG_MC68681_ISR_Push:
+  ; is there space in the queue?
+  moveq   #0, d1
+  move.b  UART_Queue_WritePtr(a0), d1
 
+  cmp.b   #(UART_Queue_DataLen-1), d1
+  blt     .QueueFull
+
+  ; yep, write it to where the write pointer says
+  move.b  d0, UART_Queue_Data(a0, d1)
+
+  ; increment write pointer
+  addq.b  #1, UART_Queue_WritePtr(a0)
+
+  ; we pushed the byte, clear carry flag
+  rts
+
+; the queue is full :(
+.QueueFull:
+  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -72,39 +137,16 @@ VUBUG_MC68681_ISR_ChB_Rx:
 ; Char is returned to d0
 ;
 getch:
-  movem.l #$2060,-(a7)            ;same as lgch above d2,a1,a2
+  ; save registers and set up the queue
+  movem.l d1/a1, -(sp)
+  lea     (UART_A_Queue), a1
 
-.tryAgain:
-  ori.w   #$0700,sr
+  ; actually read the char
+  bsr     VUBUG_MC68681_Getch
 
-  ; get input buffer and check if we have a byte
-  lea     ibuff,a1
-  move.w  count(a1),t1
-  beq     .waitForByte
-
-  ; yay, we have data. finaggle the queue to get at it
-  moveq   #$0,d0
-  movea.w head(a1),d2
-  ror.w   #$08,d2
-  andi.w  #$00ff,d2
-
-  ; decrement one from the queue
-  addq.b  #$1,head(a1)
-  subq.b  #$1,count(a1)
-  andi.b  #$0f,head(a1)
-
-  ; read out the byte of data :)
-  lea     queue(a1),a1
-  move.b  $0(a1,d2.w),d0
-
-  andi.w  #$f8ff,sr
-  movem.l (a7)+,#$0604            ;regs d2,a1,a2
+  ; clean up (restore registers)
+  movem.l (sp)+, d1/a1
   rts
-
-; waits for a byte
-.waitForByte:
-  stop    #$2000
-  bra     .tryAgain
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -113,21 +155,58 @@ getch:
 ;
 ; Char is returned to d0
 ;
-lgch:   movem.l #$2060,-(a7)            ;save registers d2,a1,a2
-lagn:   ori.w   #$0700,sr               ;diable interrupts
-        lea     lbuff,a1                ;point at buffer
-        move.w  count(a1),t1            ;see if there is a cahracter
-        beq     lwait                   ;No, so wait
-        move.w  head(a1),d2             ;Yes, find it and update
-        ror.w   #$08,d2
-        andi.w  #$00ff,d2
-        addq.b  #$1,head(a1)
-        subq.b  #$1,count(a1)
-        andi.b  #$0f,head(a1)
-        lea     queue(a1),a1            ;Return character
-        move.b  $0(a1,d2.w),d0
-        andi.w  #$f8ff,sr               ;enable interrupts and
-        movem.l (a7)+,#$0604            ;regs d2,a1/a2
-        rts
-lwait:  stop    #$2000
-        bra     lagn
+lgch:
+  ; save registers and set up the queue
+  movem.l d1/a1, -(sp)
+  lea     (UART_B_Queue), a1
+
+  ; actually read the char
+  bsr     VUBUG_MC68681_Getch
+
+  ; clean up (restore registers)
+  movem.l (sp)+, d1/a1
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Generic routine to pop a character off the queue in a1. Output is in d0, waits
+; until data is available
+;
+; CLOBBERS:
+;   d0, d1, a1
+VUBUG_MC68681_Getch:
+  ; nothing to do here hehe
+
+.tryAgain:
+  ; ensure interrupts are disabled while we check these fields
+  ori.w   #$0700, sr
+
+  ; is there a byte waiting in the buffer?
+  tst.b   UART_Queue_WritePtr(a1)
+  beq     .waitForByte
+
+  ; read the byte at the head and decrement write ptr
+  subq.b  #1, UART_Queue_WritePtr(a1)
+
+  lea     UART_Queue_Data(a1), a1
+  move.b  0(a1), d0
+
+  ; move queue (we copy all but the last byte)
+  moveq   #(UART_Queue_DataLen-2), d1
+
+.CopyLoop:
+  move.b  1(a1), (a1)
+  addq    #1, a1 ; XXX: can we use postincrement?
+  dbf     d1, .CopyLoop
+
+  ; we're done!
+  andi.w  #$f8ff, sr
+  rts
+
+; waits for a byte to be received: really, this waits for an interrupt before
+; trying again but whatever man
+.waitForByte:
+  ; this will re-enable interrupts implicitly
+  stop    #$2000
+  bra     .tryAgain

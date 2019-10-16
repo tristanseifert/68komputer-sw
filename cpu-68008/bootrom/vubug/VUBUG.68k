@@ -168,8 +168,10 @@ uav7:   dc.l    $00000000
 sarea:  dcb.w   $80,$0000               ;system stack
 stack   =       *
 bktab:  dcb.w   $0a,$0000               ;breakpoint table
+
 _sr:    dc.w    $0000                   ;register save area
 _pc:    dc.l    $00000000
+
 dr0:    dc.l    $00000000
 dr1:    dc.l    $00000000
 dr2:    dc.l    $00000000
@@ -186,40 +188,57 @@ ar4:    dc.l    $00000000
 ar5:    dc.l    $00000000
 ar6:    dc.l    $00000000
 ar7:    dc.l    $00000000
+
 ptab:   dcb.w   $3,0000                 ;prototype table
 rexam:  dc.w    $0000                   ;register examination pointer
 exam:   dc.w    $0000                   ;memory examination pointer
+
 t1:     dc.w    $0000                   ;temporary work area
 t2:     dc.w    $0000
 t3:     dc.w    $0000
 t4:     dc.w    $0000
 t5:     dc.w    $0000
+
 ctrls:  dc.w    $0000                   ;ctrl-s,ctrl-q flag
 bkptf   =       *-1                     ;breakpoint flag
-lbuff:  dcb.w   $0b,0000                ;load buffer
-ibuff:  dcb.w   $0b,0000                ;terminal buffer
+
+; lbuff:  dcb.w   $0b,0000                ;load buffer
+; ibuff:  dcb.w   $0b,0000                ;terminal buffer
 users:  dcb.w   $80,0000                ;users stack area
 ustck   =       *
+
 aend:   dc.w    $0000
 siz:    dc.w    $0000
 writm:  dc.w    $0000
 echo:   dc.w    $0000                   ;terminal port echo flag
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; define the 68681 memory space here
+; queues of received characters. the oldest character will always be at address
+; 0 of the queue, with newly received characters being placed at successive
+; locations. A counter is provided to indicate the locaton at which data is
+; currently being written.
+;
+; Detecting whether data is available in the queue can be done by checking the
+; write pointer: if it is at the head of the queue (0) there is no data.
+;
+; Queues are represented as follows:
+; - $00: Write pointer
+; - $01: Unused, should be 0
+; - $02: Data area, 16 bytes
+UART_Queue_WritePtr             = $0
+UART_Queue_Data                 = $2
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;Terminal port
-;
-ttyst   =       $0000c000
-ttyd    =       $0000c002
-;
-;Load port
-;
-lpst    =       $0000a000
-lpd     =       $0000a002
+UART_Queue_DataLen              = $10
 
+UART_A_Queue:
+  dc.b  0, 0
+  dc.l  0, 0, 0, 0
+  even
+
+UART_B_Queue:
+  dc.b  0, 0
+  dc.l 0, 0, 0, 0
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;+++++++++++++++++++++++++++++++++++++++++
@@ -231,10 +250,12 @@ lpd     =       $0000a002
 
 ; this is the escape sequence Esc E
 csc     =       $1b45           ;clear screen (h-19)
+; define some other characters
 cr      =       $0d
 lf      =       $0a
 nul     =       $00
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 howdy:  dc.w    csc
         dc.b  "M68000 Monitor VUBUG "
         dc.b "Version 4.0 11 August, 1988"
@@ -304,14 +325,30 @@ start:
 ;         dc.b    cr,lf,nul
 
 ; set up buffers
-gwan:   lea     ibuff,a1                ;setup buffers
-        move.w  #$0000,head(a1)
-        move.w  #$ffff,tail(a1)
-        move.w  #$0000,count(a1)
-        lea     lbuff,a1
-        move.w  #$0,head(a1)            ;set queue for lp
-        move.w  #$ffff,tail(a1)
-        move.w  #0,count(a1)
+gwan:
+        ; clear both of our receive buffers
+        moveq   #0, d0
+        move.b  d0, (UART_Queue_WritePtr+UART_A_Queue)
+        move.b  d0, (UART_Queue_WritePtr+UART_B_Queue)
+
+        lea     UART_Queue_Data+UART_A_Queue, a0
+        lea     UART_Queue_Data+UART_B_Queue, a0
+        move    #3, d1
+
+.Clear:
+        move.l  d0, (a0)+
+        move.l  d0, (a1)+
+        dbf     d1, .Clear
+
+        ; lea     ibuff,a1                ;setup buffers
+        ; move.w  #$0000,head(a1)
+        ; move.w  #$ffff,tail(a1)
+        ; move.w  #$0000,count(a1)
+        ; lea     lbuff,a1
+        ; move.w  #$0,head(a1)            ;set queue for lp
+        ; move.w  #$ffff,tail(a1)
+        ; move.w  #0,count(a1)
+
         move.w  #0,exam                 ;initialize control variables
         move.b  #0,ctrls
         move.b  #0,bkptf
@@ -337,8 +374,7 @@ done:
         lea     howdy,a0                ;say hello
         bsr     writs
 
-        ; move.b  #$95,ttyst              ;enable interrupts from ports
-        ; move.b  #$95,lpst
+        ; enable receiving characters here (TODO)
 
         bset    #$00,echo               ;turn on terminal echo
         bra     comm                    ;enter command loop
@@ -349,20 +385,22 @@ done:
 ; passed in d0 to tty. (UART A)
 ;
 writ:
-        btst    #0, ctrls               ;Is ctrl-s active
-        beq     cwrit                   ;no, so write it
-        stop    #$2000                  ;yes, so wait on next character
-        bra     writ                    ;when awakened try to write the char
-cwrit:
+        btst    #0, ctrls               ; Is ctrl-s active
+        beq     .doWrite                ; no, so write character
+
+        stop    #$2000                  ; yes, so wait on next character
+        bra     writ                    ; when awakened try to write the char
+
+.doWrite:
         ; write character to DUART
         move.b  d0,(MC68681_Base+MC68681_W_THRA)
 
         ; then, wait for tx to complete
-writa:
+.wait:
         ; read the status register, check TXRDY bit (2), loop while clear
         move.b  (MC68681_Base+MC68681_R_SRA), d0
         btst    #2, d0
-        beq     writa
+        beq     .wait
         rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -375,10 +413,10 @@ writu:
         move.b  d0,(MC68681_Base+MC68681_W_THRB)
 
         ; then, wait for tx to complete
-writp:
+.wait:
         move.b  (MC68681_Base+MC68681_R_SRB), d0
         btst    #2, d0
-        beq     writp
+        beq     .wait
         rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -388,8 +426,10 @@ writp:
 ;
 writs:  move.b  (a0)+,d0                ;a0 is address of string
         beq     dwrts
+
         bsr     writ
         bra     writs
+
 dwrts:  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -978,10 +1018,14 @@ load:   bsr     getch                   ;get delimiter
         move.l  d0,_pc                  ;save load point for go command
         bra     ld1
 lnoof:  move.l  #$0,_pc
-ld1:    lea     lbuff,a1                ;point at lpbuff
-        move.w  #$0,head(a1)            ;set queue for lp
-        move.w  #$ffff,tail(a1)
-        move.w  #$0,count(a1)
+ld1:
+        ; this clears the UART B receive buffer
+        ; lea     lbuff,a1                ;point at lpbuff
+        ; move.w  #$0,head(a1)            ;set queue for lp
+        ; move.w  #$ffff,tail(a1)
+        ; move.w  #$0,count(a1)
+        move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
+
         lea     lmes,a0                 ;print starting message
         bsr     writs
         move.b  #$0d,d0                 ;load a <cr>
@@ -1055,10 +1099,14 @@ uload:  bsr     getch                   ;same as above, except that it
         move.l  d0,_pc
         bra     uld1
 ulnoof: move.l  #$0,_pc
-uld1:   lea     ibuff,a1
-        move.w  #$0,head(a1)
-        move.w  #$ffff,tail(a1)
-        move.w  #$0,count(a1)
+uld1:
+        ; this clears the UART A receive buffer
+        ; lea     ibuff,a1
+        ; move.w  #$0,head(a1)
+        ; move.w  #$ffff,tail(a1)
+        ; move.w  #$0,count(a1)
+        move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
+
         lea     lmes,a0
         bsr     writs
         move.b  #$0d,d0
