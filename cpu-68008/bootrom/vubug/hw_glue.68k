@@ -84,9 +84,10 @@ VUBUG_MC68681_ISR_ChA_Rx:
   move.b  #$00, ctrls
   bra     .Done
 
-; Handle Ctrl+C: TODO (should return to prompt)
+; Handle Ctrl+C: (should return to prompt)
 .CtrlC:
-  bra     .Done
+  ; jump into the restart routine
+  bra     VUBUG_Restart
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Reads the data from the Channel B register and adds it to the receive queue
@@ -128,6 +129,8 @@ VUBUG_MC68681_ISR_Push:
 ; the queue is full :(
 .QueueFull:
   rts
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;

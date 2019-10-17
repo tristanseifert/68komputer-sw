@@ -1,0 +1,369 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Various debugging commands
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Proto - Prototype command in ram
+;
+;******************************************
+;*                                        *
+;* Prototype commands are invoked:        *
+;*                                        *
+;*      px xxxx - load address xxxx for   *
+;*                prototype command x.    *
+;*      px<cr> - execute prototype com-   *
+;*               mand x.                  *
+;*                                        *
+;*      NOTE: x must be a 1, 2, or 3      *
+;*                                        *
+;******************************************
+;
+pmess:  dc.b    lf,cr
+        dc.b    "Prototype ", nul
+pm1:    dc.b    "running:"
+        dc.b    lf,cr,nul
+pm2:    dc.b    "installed"
+        dc.b    cr,nul,nul
+proto:  bsr     getch                   ;get prototype number
+        move.l  d0,d1                   ;save number
+        andi.b  #$0f,d1                 ;strip leading hex digit
+        subq.b  #$1,d1                  ;normalize to 0
+        lsl.l   #$1,d1                  ;multiply by 2
+        lea     ptab,a1                 ;set starting address
+        adda.l  d1,a1                   ;add offset
+        bsr     getch                   ;get delimiter
+        cmp.b   #$0d,d0                 ;if <cr> then do command
+        beq     prun
+        lea     getch,a0                ;else install in table
+        bsr     getw                    ;get address
+        move.w  d0,(a1)                 ;move in address
+        lea     pmess,a0
+        bsr     writs
+        lea     pm2,a0
+        bsr     writs
+        bra     prts
+prun:   movea.w (a1),a1                 ;run prototype command
+        lea     pmess,a0
+        bsr     writs
+        lea     pm1,a0
+        bsr     writs
+        jsr     (a1)                    ;go do it
+prts:   rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Bkpt - Set/Remove breakpoints
+;
+;
+;**********************************************
+;*                                            *
+;* Breakpoint is invoked as follows:          *
+;*                                            *
+;*         b<cr> - display breakpoints        *
+;*         b+xxxx - add a breakpoint at xxxx  *
+;*         b-xxxx - delete breakpoint at xxxx *
+;*         b# - delete all breakpoints        *
+;*                                            *
+;**********************************************
+;
+brmes:  dc.b    lf,cr
+        dc.b    "Bkpts removed", nul
+bdmes:  dc.b    lf,cr
+        dc.b    "Bkpts at:"
+        dc.b    lf,cr,nul
+bpmes:  dc.b    lf,cr
+        dc.b    "Bkpt added at ", nul
+bmmes:  dc.b    lf,cr
+        dc.b    "Bkpt deleted at ", nul
+bbmes:  dc.b    lf,cr
+        dc.b    "Bkpt error", nul
+        dc.b    nul
+bkin:   dc.w    $FFFF                   ;instruction constant
+bkpt:   bsr     getch                   ;get delimiter
+        cmp.b   #$0d,d0                 ;if <cr> then print all bkpts
+        beq     bdis
+        cmp.b   #$2b,d0                 ;if + then add a bkpt
+        beq     bpls
+        cmp.b   #$2d,d0                 ;if - then delete a bkpt
+        beq     bmin
+        cmp.b   #$23,d0                 ;if # then delete all bkpts
+        bne     bbad                    ;else its a bad message
+brem:   moveq   #$4,d1                  ;remove all bkpts
+        lea     bktab-4,a1              ;set for loop
+blp1:   adda.w  #$4,a1
+        movea.w iloc(a1),a0             ;get address from table
+        cmpa.w  #$00,a0                 ;if 0 then not an entry
+        beq     bno
+        move.w  instr(a1),(a0)          ;else move instr back
+        move.l  #$0,instr(a1)           ;clear table entry
+bno:    dbf     d1,blp1                 ;loop
+        bclr    #$0,bkptf               ;clear bkpt if in one
+        btst    #$2,bkptf               ;In trace ?
+        bne     brno                    ;Yes.
+        andi.w  #$7fff,_sr              ;else clear trace bit
+brno:   lea     brmes,a0                ;say done
+        bsr     writs
+        bra     brts
+bdis:   lea     bdmes,a0                ;handle display all bkpts
+        bsr     writs
+        lea     bktab-4,a1              ;set loop
+        moveq   #$4,d1
+bdlp:   adda.w  #$4,a1                  ;loop
+        move.w  iloc(a1),d0             ;get bkpt
+        beq     belp                    ;if 0 then not an entry
+        bsr     writw
+        bsr     crlf
+belp:   dbf     d1,bdlp                 ;loop
+        bra     brts
+bpls:   lea     bktab-4,a1              ;add a bkpt
+        moveq   #$4,d1                  ;set for loop
+        lea     getch,a0                ;setup to get address
+        bsr     getw
+bl2:    adda.w  #$4,a1                  ;loop
+        cmp.w   iloc(a1),d0             ;found entry already in table ?
+        bne     bmo                     ;yes
+        movea.w d0,a2                   ;reset it for insurance
+        move.w  bkin,(a2)               ;set instruction
+        bra     bfnd                    ;exit for found
+bmo:    move.w  iloc(a1),d2             ;move to set condition codes
+        dbeq    d1,bl2                  ;exit if 0 entry found
+        bne     bbad                    ;if exit is on count and not 0 then error
+        move.w  d0,iloc(a1)             ;move in address
+        movea.w d0,a2                   ;point at location
+        move.w  (a2),instr(a1)          ;get instruction into table
+        move.w  bkin,(a2)               ;set bkpt instruction
+bfnd:   lea     bpmes,a0                ;load message
+        bsr     writs
+        move.l  a2,d0
+        bsr     writw
+        bclr    #$1,bkptf               ;clear in-single flag
+        btst    #$2,bkptf               ;In trace ?
+        bne     brts                    ;Yes
+        andi.w  #$7fff,_sr              ;clear trace bit
+        bra     brts
+bmin:   lea     bktab-4,a1              ;delete a breakpoint entry
+        moveq   #$4,d1                  ;setup for search
+        lea     getch,a0                ;setup for terminal input
+        bsr     getw
+bl3:    adda.w  #$4,a1                  ;loop
+        cmp.w   iloc(a1),d0             ;Is this the one ?
+        dbeq    d1,bl3                  ;if yes then exit else loop
+        bne     bbad                    ;Exit on count ?
+        movea.w d0,a2                   ;no, so get address
+        move.w  instr(a1),(a2)          ;return instruction
+        move.l  #$0,instr(a1)           ;clear table entry
+        btst    #$0,bkptf               ;In breakpoint ?
+        beq     bok                     ;No
+        cmp.l   _pc,d0                  ;Yes, This breakpoint ?
+        bne     bok                     ;No
+        bclr    #$0,bkptf               ;Yes, so clear handling it
+        btst    #$2,bkptf               ;In trace ?
+        bne     bok                     ;Yes
+        andi.w  #$7fff,_sr              ;else clear trace flag
+bok:    lea     bmmes,a0                ;load message
+        bsr     writs
+        move.l  a2,d0                   ;print address
+        bsr     writw
+        bra     brts
+bbad:   lea     bbmes,a0                ;error handler
+        bsr     writs
+brts:   rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; dump - dump memory
+;
+;*****************************************
+;*                                       *
+;*    dump is invoked as follows:        *
+;*                                       *
+;*    d<cr> - dump the next 64 bytes from*
+;*            last examined location     *
+;*    d xxxx<cr> - dump the next 64 bytes*
+;*                 from address xxxx     *
+;*    d xxxx,yyyy - dump the bytes bet-  *
+;*                  ween xxxx and yyyy   *
+;*                                       *
+;*****************************************
+;
+dmes:   dc.b    lf,lf,cr
+        dc.b    "Memory dump"
+        dc.b    lf,cr,nul
+dhed:   dc.b    lf,cr
+        dc.b    "      0  1  2  3"
+        dc.b    "  4  5  6  7  8  9  a"
+        dc.b    "  B  C  d  E  F"
+dcr:    dc.b    lf,cr,nul
+dump:   lea     getch,a0                ;set for terminal input
+        bsr     getch                   ;get delimiter
+        cmp.b   #$0d,d0                 ;if <cr> then dump from pointer
+        bne     dexam                   ;else get address
+        movea.w exam,a1                 ;get exam
+        movea.w a1,a2                   ;save it for ending address
+        adda.w  #$40,a2                 ;add 64 for length of dump
+        bra     dgo                     ;go do it
+dexam:  bsr     getw                    ;get starting address
+        movea.w d0,a1
+        bsr     getch                   ;get delimiter
+        cmp.b   #$2c,d0                 ;if , the get ending address
+        bne     dcom
+        bsr     getw                    ;get address
+        movea.w d0,a2                   ;save it
+        bra     dgo                     ;go dump
+dcom:   movea.w a1,a2                   ;default to 64 byte dump
+        adda.w  #$40,a2
+dgo:    lea     dmes,a0                 ;do the dump
+        bsr     writs
+        lea     dhed,a0                 ;print header
+        bsr     writs
+        move.l  a1,d0                   ;set starting address at 16 byte boundary
+        and.b   #$f0,d0
+        movea.w d0,a1
+        move.l  a2,d0                   ;round ending address to boundary
+        or.b    #$0f,d0
+        movea.w d0,a2
+        moveq   #$0f,d1                 ;move byte count to register
+dl1:    move.l  a1,d0                   ;write starting address
+        bsr     writw
+        movea.w a1,a3                   ;save starting address
+dflp:   moveq   #$20,d0                 ;write a space
+        bsr     writ
+        move.b  (a1)+,d0                ;get next byte
+        bsr     writb                   ;write it
+        dbf     d1,dflp                 ;loop
+        moveq   #$0f,d1                 ;reset byte count
+        movea.w a3,a1                   ;refetch starting address
+        moveq   #$20,d0                 ;write a space
+        bsr     writ
+dslp:   move.b  (a1)+,d0                ;write the byte representation
+        cmp.b   #$20,d0                 ;if not printable then a dot
+        bge     dok
+        move.b  #$2e,d0                 ;move in the dot
+        bra     dwrt
+dok:    cmp.b   #$7f,d0                 ;printable again ?
+        blt     dwrt                    ;yes
+        move.b  #$2e,d0                 ;no, move in a dot
+dwrt:   bsr     writ                    ;write it
+        dbf     d1,dslp                 ;line done ?
+        lea     dcr,a0                  ;yes, so cr-lf
+        bsr     writs
+        moveq   #$10,d1                 ;reset byte count
+        cmpa.l  a1,a2                   ;done ?
+        dblt    d1,dl1                  ;NO, so loop
+        move.w  a1,exam                 ;yes, so update exam
+        rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Trace - Set trace mode
+;
+;*****************************************
+;*                                       *
+;* Invoke trace as follows:              *
+;*                                       *
+;*       t+ - trace a program's path     *
+;*       t- - turn off trace             *
+;*                                       *
+;*****************************************
+;
+tmes:   dc.b    lf,cr
+        dc.b    "Trace ", nul
+tonm:   dc.b    "on", nul
+toffm:  dc.b    "off", nul
+trace:  bsr     getch                   ;get command
+        move.l  d0,d1                   ;save it
+        lea     tmes,a0                 ;write message
+        bsr     writs
+        cmp.b   #$2b,d1                 ;Is it a + ?
+        beq     ton                     ;yes
+        btst    #$0,bkptf               ;In breakpoint ?
+        bne     tclr                    ;Yes, so don't clear trace
+        andi.w  #$7fff,_sr              ;clear trace
+tclr:   bclr    #$2,bkptf               ;turn-off in-trace flag
+        lea     toffm,a0                ;load off message
+        bra     tdone                   ;exit
+ton:    ori.w   #$8000,_sr              ;set trace bit
+        bclr    #$1,bkptf               ;clear single step
+        bset    #$2,bkptf               ;set in-trace flag
+        lea     tonm,a0                 ;write message
+tdone:  bsr     writs
+        rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Single - set single step
+;
+;*****************************************
+;*                                       *
+;* Invoke single step as follows:        *
+;*                                       *
+;*       s+ - turn on single step        *
+;*       s- - turn off single step       *
+;*                                       *
+;*****************************************
+;
+smes:   dc.b    lf,cr
+        dc.b    "Single step", nul
+sonm:   dc.b    " on ", nul
+soffm:  dc.b    " off ", nul
+        dc.b    nul
+singl:  bsr     getch                   ;get command
+        move.l  d0,d1                   ;save it
+        lea     smes,a0                 ;write message
+        bsr     writs
+        cmp.b   #$2b,d1                 ;+ ?
+        beq     son                     ;yes
+        btst    #$0,bkptf               ;In breakpoint ?
+        bne     sclr                    ;Yes, so don't clear trace
+        andi.w  #$7fff,_sr              ;clear trace bit
+sclr:   bclr    #$1,bkptf               ;turn-off in-single flag
+        lea     soffm,a0                ;write off message
+        bsr     writs
+        bra     sdone                   ;exit
+son:    bclr    #$0,bkptf               ;clear in-bkpt flag
+        bset    #$1,bkptf               ;set in-single flag
+        bclr    #$2,bkptf               ;clear in-trace flag
+        lea     sonm,a0                 ;write message
+        bsr     writs
+        bsr     brem                    ;remove all breakpoints for single
+        ori.w   #$8000,_sr              ;set trace bit
+sdone:  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Go - Start user program
+;
+;*****************************************
+;*                                       *
+;* Invoke go as follows:                 *
+;*                                       *
+;*      g<cr> - go from start address in *
+;*              last load                *
+;*      <cr> - same as g<cr>             *
+;*      g xxxx - go from address xxxx    *
+;*                                       *
+;*****************************************
+;
+gmes:   dc.w    csc
+        dc.b    "Program:"
+        dc.b    lf,lf,cr,nul
+go:     bsr     getch                   ;get seperator
+        cmp.b   #$0d,d0                 ;if CR then
+        beq     ggo                     ;start from default
+gget:   lea     getch,a0                ;else get start addr
+        bsr     getw                    ;as given in comm.
+        move.l  d0,_pc                  ;set for return
+ggo:    btst    #$1,bkptf               ;single set ?
+        bne     gnom                    ;Yes so no message
+        lea     gmes,a0                 ;write message
+        bsr     writs
+gnom:   addq.w  #$4,a7                  ;pop the stack
+        movem.l dr0,#$7fff              ;get saved values d0-a6
+        move.l  a7,t1                   ;save system stack pointer
+        movea.l ar7,a7                  ;get saved user stack pointer
+        move.l  a7,usp                  ;reset the user stack
+        movea.l t1,a7                   ;reset system stack
+gbmov:  move.l  _pc,-(a7)               ;set up return pc
+        andi.w  #$f8ff,_sr              ;enable interrupts
+        move.w  _sr,-(a7)               ;set up return sr
+        rte

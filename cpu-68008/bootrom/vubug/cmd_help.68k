@@ -1,0 +1,263 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Provides a short built-in help system over all commands.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Help - display help messages
+;
+;*****************************************
+;*                                       *
+;* Invoke help as follows:               *
+;*                                       *
+;*      h<cr> - print list of available  *
+;*              help                     *
+;*      hx - print help message for x    *
+;*                                       *
+;*****************************************
+hlph:   dc.b   " H - display help messages"
+        dc.b    cr,lf,nul
+hlph1:  dc.b   " Invoke help as follows:"
+        dc.b    cr,lf
+        dc.b   "      h<cr> - print list of available help"
+        dc.b    cr,lf
+        dc.b   "      hx - print help message for x"
+        dc.b    cr,lf,nul
+
+hlpc:   dc.b   " C - Copy memory blocks"
+        dc.b    cr,lf,nul
+hlpc1:  dc.b   " Copy is invoked as follows:"
+        dc.b    cr,lf
+        dc.b   "          c xxxx=yyyy,zzzz"
+        dc.b    cr,lf
+        dc.b   " Copy locations yyyy thru zzzz to"
+        dc.b    cr,lf
+        dc.b   " locations xxxx and upward."
+        dc.b    cr,lf,nul
+
+hlpm:   dc.b   " M - memory update"
+        dc.b    cr,lf,nul
+hlpm1:  dc.b   " Memory sub-commands are as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "          m<cr> - start memory mode"
+        dc.b    cr,lf
+        dc.b   "          m xxxx - start m mode at location xxxx"
+        dc.b    cr,lf
+        dc.b   "          .xxxx - set pointer to location xxxx"
+        dc.b    cr,lf
+        dc.b   "          =xx - update current location to xx"
+        dc.b    cr,lf
+        dc.b   "          ,xx - increment location and update it to xx"
+        dc.b    cr,lf
+        dc.b   "          + - increment location"
+        dc.b    cr,lf
+        dc.b   "          - - decrement location"
+        dc.b    cr,lf
+        dc.b   "          <cr> - print current location and value"
+        dc.b    cr,lf,nul
+
+hlpr:   dc.b   " R - Modify/examine registers"
+        dc.b    cr,lf,nul
+hlpr1:  dc.b   " Register subcommands are as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "      r<cr> - start register mode"
+        dc.b    cr,lf
+        dc.b   "      r xx - start r mode at register xx. Where xx :"
+        dc.b    cr,lf
+        dc.b   "            SR/_sr - status register"
+        dc.b    cr,lf
+        dc.b   "            PC/_pc - program counter"
+        dc.b    cr,lf
+        dc.b   "            d0 - d7 - data registers"
+        dc.b    cr,lf
+        dc.b   "            a0 - a7 - address regs."
+        dc.b    cr,lf
+        dc.b   "     .xx - set pointer to register"
+        dc.b    cr,lf
+        dc.b   "     =xxxxxxxx - update current register to xxxxxxxx"
+        dc.b    cr,lf
+        dc.b   "     <cr> - print all registers"
+        dc.b    cr,lf,nul
+
+hlpl:   dc.b   " L - Load data from host"
+        dc.b    cr,lf,nul
+hlpu:   dc.b   " U - Load data from terminal port"
+        dc.b    cr,lf,nul
+hlpl1:  dc.b   " Load is invoked as follows:"
+        dc.b    cr,lf
+        dc.b   "       l<cr> - load from host with no offset"
+        dc.b    cr,lf
+        dc.b   "       <ff> - same as l<cr> but used from emulator mode"
+        dc.b    cr,lf
+        dc.b   "       l xxxx - load with offset xxxx"
+        dc.b    cr,lf,cr,lf
+        dc.b   " Upload is invoked as follows:"
+        dc.b    cr,lf
+        dc.b    "      u<cr> - load from terminal with no offset"
+        dc.b    cr,lf
+        dc.b    "      u xxxx - load from terminal with offset xxxx"
+        dc.b    cr,lf,nul
+
+hlpe:   dc.b   " E - Enter terminal emulator mode"
+        dc.b    cr,lf,nul
+hlpe1:  dc.b   " Invoke emulator mode as follows"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "       e"
+        dc.b    cr,lf
+        dc.b   "    NOTE: That in this mode any character except"
+        dc.b    cr,lf
+        dc.b   "    a ctrl-x may be sent to the host. Ctrl-x is the"
+        dc.b    cr,lf
+        dc.b   "    escape sequence for getting out of terminal emulator"
+        dc.b    cr,lf
+        dc.b   "    mode. Ctrl-l does the same thing except a load (l)"
+        dc.b    cr,lf
+        dc.b   "    command is put in the command buffer."
+        dc.b    cr,lf,nul
+
+hlpp:   dc.b   " P - Prototype commands in RAM"
+        dc.b    cr,lf,nul
+hlpp1:  dc.b   " Prototype commands are invoked:"
+        dc.b    cr,lf
+        dc.b   "      px xxxx - load address xxxx for prototype command x."
+        dc.b    cr,lf
+        dc.b   "      px<cr> - execute prototype command x."
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "      NOTE: x must be a 1, 2, or 3"
+        dc.b    cr,lf,nul
+
+hlpb:   dc.b   " B - Set/Remove breakpoints"
+        dc.b    cr,lf,nul
+hlpb1:  dc.b   " Breakpoint is invoked as follows:"
+        dc.b    cr,lf
+        dc.b   "         b<cr> - display breakpoints"
+        dc.b    cr,lf
+        dc.b   "         b+xxxx - add a breakpoint at xxxx"
+        dc.b    cr,lf
+        dc.b   "         b-xxxx - delete breakpoint at xxxx"
+        dc.b    cr,lf
+        dc.b   "         b# - delete all breakpoints"
+        dc.b    cr,lf,nul
+
+hlpd:   dc.b   " D - dump memory"
+        dc.b    cr,lf,nul
+hlpd1:  dc.b   "    dump is invoked as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "    d<cr> - dump the next 64 bytes from last examined location"
+        dc.b    cr,lf
+        dc.b   "    d xxxx<cr> - dump the next 64 bytes from address xxxx"
+        dc.b    cr,lf
+        dc.b   "    d xxxx,yyyy - dump the bytes between xxxx and yyyy"
+        dc.b    cr,lf,nul
+
+hlpa:   dc.b   " A - Assembly listing"
+        dc.b    cr,lf,nul
+hlpa1:  dc.b   "    disassembly is invoked as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "    a<cr> - list the next 20 instructions from last location"
+        dc.b    cr,lf
+        dc.b   "    a xxxx<cr> - list the next 20 instructions from address xxxx"
+        dc.b    cr,lf
+        dc.b   "    a xxxx,yyyy - list the instructions between xxxx and yyyy"
+        dc.b    cr,lf,nul
+
+hlpt:   dc.b   " T - Set trace mode"
+        dc.b    cr,lf,nul
+hlpt1:  dc.b   " Invoke trace as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "       t+ - trace a program's path"
+        dc.b    cr,lf
+        dc.b   "       t- - turn off trace"
+        dc.b    cr,lf,nul
+
+hlps:   dc.b   " S - set single step"
+        dc.b    cr,lf,nul
+hlps1:  dc.b   " Invoke single step as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "       s+ - turn on single step"
+        dc.b    cr,lf
+        dc.b   "       s- - turn off single step"
+        dc.b    cr,lf,nul
+
+hlpg:   dc.b   " G - Start user program"
+        dc.b    cr,lf,nul
+hlpg1:  dc.b   " Invoke go as follows:"
+        dc.b    cr,lf
+        dc.b    cr,lf
+        dc.b   "      g<cr> - go from start address in last load"
+        dc.b    cr,lf
+        dc.b   "      <cr> - same as g<cr>"
+        dc.b    cr,lf
+        dc.b   "      g xxxx - go from address xxxx "
+        dc.b    cr,lf,nul
+
+htab:   dc.w    $4800           ;h - help
+        dc.w    hlph,hlph1
+        dc.w    $4d00           ;m - memory
+        dc.w    hlpm,hlpm1
+        dc.w    $4c00           ;l - load
+        dc.w    hlpl,hlpl1
+        dc.w    $5500           ;u - upload
+        dc.w    hlpu,hlpl1
+        dc.w    $4400           ;d - dump
+        dc.w    hlpd,hlpd1
+        dc.w    $5300           ;s - single step
+        dc.w    hlps,hlps1
+        dc.w    $5400           ;t - trace program
+        dc.w    hlpt,hlpt1
+        dc.w    $4700           ;g - start user program
+        dc.w    hlpg,hlpg1
+        dc.w    $4500           ;e - emulate mode
+        dc.w    hlpe,hlpe1
+        dc.w    $4200           ;b - breakpoints
+        dc.w    hlpb,hlpb1
+        dc.w    $4300           ;c - copy
+        dc.w    hlpc,hlpc1
+        dc.w    $5200           ;r - register modify
+        dc.w    hlpr,hlpr1
+        dc.w    $5000           ;p - prototype commands
+        dc.w    hlpp,hlpp1
+        dc.w    $4100           ;a - assembly listing
+        dc.w    hlpa,hlpa1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Structure of entry is topic (top),
+; address of short message (hshort),
+; and address of long message (hlong).
+;
+help:   bsr     getch           ;get argument
+        andi.b  #$5f,d0         ;make it uppercase
+        cmpi.b  #$0d,d0         ;is it a carriage return?
+        bne     htopic          ;no, so decode topic
+hall:   bsr     crlf
+        bsr     crlf
+        moveq   #$0d,d1         ;load total # topics - 1
+        lea     htab+2,a1       ;load location of short help
+shlp:   movea.w (a1),a0         ;copy help location to a0
+        bsr     writs           ;write a short help message
+        addq.w  #$06,a1         ;increment to next help message
+        dbf     d1,shlp         ;if not last message, print another one
+        rts
+htopic: lea     htab,a1         ;set up search of ctab
+        moveq   #$0d,d1         ;load total # topics - 1
+lhlp:   cmp.b   (a1),d0         ;is the topic equal to the table value?
+        beq     hprn            ;if so, print the short and long helps
+        addq.w  #$06,a1         ;else go to the next table location
+        dbf     d1,lhlp         ;if not finished, try again
+        bra     hall            ;if not one of these, print all shorts
+hprn:   bsr     crlf
+        bsr     crlf
+        addq.w  #$02,a1         ;increment a2 to short help location
+        movea.w (a1)+,a0        ;transfer address to a0
+        bsr     writs           ;write the short message
+        bsr     crlf            ;feed an extra line
+        movea.w (a1),a0         ;transfer long help address to a0
+        bsr     writs           ;write the long message
+        rts

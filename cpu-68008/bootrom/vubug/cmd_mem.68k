@@ -1,0 +1,147 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Various monitor commands to do with memory
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Copy - Copy memory blocks
+;
+;***************************************
+;*                                     *
+;* Copy is invoked as follows:         *
+;*                                     *
+;*          c xxxx=yyyy,zzzz           *
+;*                                     *
+;* Copy locations yyyy thru zzzz to    *
+;* locations xxxx and upward.          *
+;*                                     *
+;***************************************
+;
+cdmes:  dc.b    lf,cr
+        dc.b    "Copied", nul
+ctom:   dc.b    " to ", nul
+cform:  dc.b    " for ", nul
+cbyt:   dc.b    " bytes", nul
+        dc.b    nul
+copy:   bsr     getch                   ;get past blank
+        lea     getch,a0                ;setup for terminal input
+        bsr     getw                    ;get target address
+        move.l  d0,d2                   ;save it
+        movea.w d0,a2
+        bsr     getch                   ;get past =
+        bsr     getw                    ;get start address
+        move.l  d0,d3                   ;save it
+        movea.w d0,a3                   ;again
+        bsr     getch                   ;get past ,
+        bsr     getw                    ;get ending address
+        sub.l   d3,d0                   ;calculate byte count
+        move.l  d0,d4                   ;save it
+        addq.b  #$1,d4
+colp:   move.b  (a3)+,(a2)+             ;start moving
+        dbf     d0,colp
+        lea     cdmes,a0                ;say we're done
+        bsr     writs
+        move.l  d3,d0
+        bsr     writw
+        lea     ctom,a0
+        bsr     writs
+        move.l  d2,d0
+        bsr     writw
+        lea     cform,a0
+        bsr     writs
+        move.l  d4,d0
+        bsr     writw
+        lea     cbyt,a0
+        bsr     writs
+        rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Mem - memory update
+;
+;*******************************************
+;*                                         *
+;* Memory sub-commands are as follows:     *
+;*                                         *
+;*          m<cr> - start memory mode      *
+;*          m xxxx - start m mode at loca- *
+;*                     tion xxxx          *
+;*          .xxxx - set pointer to location*
+;*                  xxxx                   *
+;*          =xx - update current location  *
+;*                to xx                    *
+;*          ,xx - increment location and   *
+;*                update it to xx          *
+;*          + - increment location         *
+;*          - - decrement location         *
+;*          <cr> - print current location  *
+;*                 and value               *
+;*                                         *
+;*******************************************
+;
+mtab:   dc.w    $2e00           ;.
+        dc.w    mdot
+        dc.w    $3d00           ;=
+        dc.w    mequ
+        dc.w    $2c00           ;,
+        dc.w    mcom
+        dc.w    $2b00           ;+
+        dc.w    mplu
+        dc.w    $2d00           ;-
+        dc.w    mmin
+        dc.w    $0d00           ;<CR>
+        dc.w    mloc
+mmes:   dc.b    lf,lf,cr
+        dc.b    "Memory Mode", nul
+mprmp:  dc.b    lf,cr,':',nul
+meqm:   dc.b    " == ", 0
+mem:    bsr     getch                   ;get delimiter
+        cmp.b   #$0d,d0                 ;if <cr> then enter m
+        beq     mnoad
+        lea     getch,a0                ;else get the address
+        bsr     getw
+        bra     mplp                    ;set the address
+mnoad:  moveq   #$0,d0                  ;start with no address
+mplp:   move.w  d0,exam                 ;set the address
+        lea     mmes,a0                 ;load message
+        bsr     writs
+mlp:    lea     mprmp,a0                ;write memory prompt
+        bsr     writs
+        bsr     getch                   ;enter memory command loop
+        moveq   #$5,d2                  ;set for search
+        lea     mtab-4,a0
+mmlp:   addq.w  #$4,a0                  ;search loop like comm
+        cmp.b   (a0),d0
+        dbeq    d2,mmlp
+        bne     mexit                   ;exit if not found
+        movea.w $2(a0),a0               ;get routine address
+        jsr     (a0)                    ;go to it
+        bra     mlp                     ;stay in memory loop
+mexit:  rts
+mdot:   lea     getch,a0                ;handle setting of address
+        bsr     getw                    ;get address
+        move.w  d0,exam                 ;set in p[ointer
+        bsr     mloc                    ;print address and value
+        rts
+mequ:   lea     getch,a0                ;handle new value at pointer
+        bsr     getb                    ;get new value
+        movea.w exam,a0                 ;set address
+        move.b  d0,(a0)                 ;move new value
+        bsr     mloc                    ;write new value
+        rts
+mcom:   addq.w  #$1,exam                ;handle pointer increment by ,
+        bsr     mequ                    ;write new address and value
+        rts
+mplu:   addq.w  #$1,exam                ;increment pointer
+        bsr     mloc                    ;write val
+        rts
+mmin:   subq.w  #$1,exam                ;decrement pointer
+        bsr     mloc
+        rts
+mloc:   bsr     crlf                    ;write address and value
+        move.w  exam,d0                 ;write address
+        bsr     writw
+        lea     meqm,a0
+        bsr     writs
+        movea.w exam,a0
+        move.b  (a0),d0                 ;write value
+        bsr     writb
+        rts

@@ -1,0 +1,214 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; IRQ and trap handlers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Generic trap handler
+;
+ghmes:  dc.b    lf,cr
+        dc.b    "Trap at ", nul
+        dc.b    nul
+ghlr:   movem.l #$ffff,dr0              ;save all registers d0-a7
+        move.l  usp,a6                  ;get user stack pointer
+        move.l  a6,ar7                  ;and save it
+        move.w  (a7)+,_sr               ;save current SR
+        move.l  (a7)+,_pc               ;save current return value
+        pea     comm                    ;set for return to comm
+        move.w  ssri,-(a7)              ;enable interrupts on return
+ghpr:   lea     ghmes,a0                ;wx message
+ghpr1:  bsr     writs
+        move.l  _pc,d0
+        bsr     writl
+        rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Breakpoint handler
+;
+bhmes:  dc.b    lf,cr
+        dc.b    "Breakpoint at ", nul
+binin:  dc.b    lf,cr
+        dc.b    "Bad Instruction at ", nul
+        dc.b    nul
+bhlr:   move.w  ssrn,sr                 ;disable interrupts
+        movem.l #$ffff,dr0              ;save registers d0-a7
+        move.l  usp,a6                  ;get and save user stack pointer
+        move.l  a6,ar7
+        move.w  (a7)+,_sr               ;save status register
+        move.l  (a7)+,_pc               ;save program counter
+        pea     comm                    ;set for return to comm
+        move.w  ssri,-(a7)              ;enable interrupts on return
+        movea.l _pc,a0                  ;get pc on interrupt
+        cmpi.w  #$ffff,(a0)             ;was interrupt caused by bkpt instruction ?
+        beq     bsnd                    ;Yes
+        lea     binin,a0                ;No, invalid instruction
+        bra     ghpr1                   ;go wx message
+bsnd:   lea     bhmes,a0                ;wx bkpt message
+        bsr     writs
+        move.l  _pc,d0
+        bsr     writw
+        bsr     crlf
+        lea     bktab-4,a1              ;find the breakpoint entry
+        move.l  #$4,d1                  ;maximum of 5
+        move.l  _pc,d0                  ;this is where it happened
+bhl:    adda.w  #$4,a1
+        cmp.w   iloc(a1),d0             ;is this the entry ?
+        dbeq    d1,bhl                  ;loop if not
+        bne     bhrte                   ;not found so quit
+        movea.w d0,a2                   ;point at it
+        move.w  instr(a1),(a2)          ;move instruction back in
+        ori.w   #$8000,_sr              ;set trace mode on
+        bset    #$0,bkptf               ;set in-bkpt flag
+bhrte:  rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Trace handler
+;
+tlocm:  dc.b    lf,cr
+        dc.b    "PC == ", nul
+        dc.b    nul
+thlr:   move.w  ssrn,sr                 ;disable interrupts
+        move.l  a0,ar0                  ;save used registers
+        move.l  d0,dr0
+        move.l  a1,ar1
+        move.l  d1,dr1
+        move.l  a2,ar2
+        move.l  d2,dr2
+        btst    #$0,bkptf               ;Handling a breakpoint ?
+        beq     treal                   ;No, so its a real trace
+        movea.l _pc,a0                  ;Yes, find where it occurred
+        move.w  bkin,(a0)               ;reset the bkpt instruction
+        bclr    #$0,bkptf               ;clear in progress bkpt
+        btst    #$2,bkptf               ;In trace mode
+        bne     treal                   ;yes, go trace it
+thma0:  andi.w  #$7fff,(a7)             ;No, so clear the trace bit
+        bra     trte
+treal:  move.l  $2(a7),_pc              ;Not (just) a bkpt but trace or single
+        btst    #$1,bkptf               ;Trace ?
+        beq     trpr                    ;Yes
+        movem.l #$ffff,dr0              ;No,single-step d0-a7
+        move.l  usp,a6                  ;save registers and stack pointer
+        move.l  a6,ar7
+        move.w  (a7)+,_sr               ;save status register
+        move.l  (a7)+,_pc               ;save pc
+        pea     comm                    ;fake return to comm
+        move.w  ssri,-(a7)              ;enable interrupts on return
+trpr:   lea     tlocm,a0                ;wx message
+        bsr     writs
+        move.l  _pc,d0
+        bsr     writl
+        bsr     crlf
+        move.l  _pc,a1                  ;load the current address
+        bsr     ass1                    ;wx the disassembled instruction
+trte:   movea.l ar0,a0                  ;restore used registers
+        move.l  dr0,d0
+        movea.l ar1,a1
+        move.l  dr1,d1
+        movea.l ar2,a2
+        move.l  dr2,d2
+tr:     rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Privilege Violation Handler
+;
+; See generic handler for details
+;
+prmes:  dc.b    lf,cr
+        dc.b    "Privilege Error at ", nul
+phlr:   movem.l #$ffff,dr0              ;regs d0-a7
+        move.l  usp,a6
+        move.l  a6,ar7
+        move.w  (a7)+,_sr
+        move.l  (a7)+,_pc
+        pea     comm
+        move.w  ssri,-(a7)
+prpr:   lea     prmes,a0
+        bra     ghpr1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; address error/bus error trap
+;
+abmes:  dc.b    lf,cr
+        dc.b    "address error at ", nul
+abhlr:  movem.l #$ffff,dr0              ;regs d0-a7
+        move.l  usp,a6
+        move.l  a6,ar7                  ;same as above but...
+        move.w  $8(a7),_sr              ;status register is deeper in stack
+        move.l  $a(a7),_pc              ;also pc
+        pea     comm
+        move.w  ssri,-(a7)
+abpr:   lea     abmes,a0
+        bra     ghpr1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Macro instruction handlers
+;
+;
+; Exit
+;
+texit:  movem.l #$ffff,dr0              ;save register values d0-a7
+        move.l  usp,a6                  ;save user stack pointer
+        move.l  a6,ar7
+        move.w  (a7)+,_sr               ;save status register
+        move.l  (a7)+,_pc               ;save pc
+        lea     stack,a7                ;reset system mode stack
+        pea     comm                    ;fake return to comm
+        move.w  ssri,-(a7)              ;ditto for status
+        rte
+
+;
+; Getb
+;
+tgetb:  lea     getch,a0
+        bsr     getb
+        rte
+;
+; Getw
+;
+tgetw:  lea     getch,a0
+        bsr     getw
+        rte
+;
+; Getl
+;
+tgetl:  lea     getch,a0
+        bsr     getl
+        rte
+;
+; Wrtb
+;
+twrtb:  bsr     writb
+        rte
+;
+; Wrtw
+;
+twrtw:  bsr     writw
+        rte
+;
+; Wrtl
+;
+twrtl:  bsr     writl
+        rte
+;
+; Getc
+;
+tgetc:  bsr     getch
+        rte
+;
+; Wrts
+;
+twrts:  bsr     writs
+        rte
+;
+; Wrtc
+;
+twrtc:  bsr     writ
+        rte
+;
+; Crlf
+;
+tcrlf:  bsr     crlf
+        rte
