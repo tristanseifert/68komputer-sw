@@ -7,7 +7,7 @@
 ; receive/transmit.
 VUBUG_MC68681_ISR:
   ; save regs
-  movem.l d0-d1, -(sp)
+  movem.l d0-d1/a0, -(sp)
 
   ; read ISR state
   move.b  (MC68681_Base+MC68681_R_ISR), d0
@@ -42,8 +42,9 @@ VUBUG_MC68681_ISR:
 
   ; done, clean up
 .done:
-  movem.l (sp)+, d0-d1
-  rts
+  movem.l (sp)+, d0-d1/a0
+  ; rts
+  rte
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -115,7 +116,7 @@ VUBUG_MC68681_ISR_Push:
   move.b  UART_Queue_WritePtr(a0), d1
 
   cmp.b   #(UART_Queue_DataLen-1), d1
-  blt     .QueueFull
+  bhs     .QueueFull
 
   ; yep, write it to where the write pointer says
   move.b  d0, UART_Queue_Data(a0, d1)
@@ -142,7 +143,7 @@ VUBUG_MC68681_ISR_Push:
 getch:
   ; save registers and set up the queue
   movem.l d1/a1, -(sp)
-  lea     (UART_A_Queue), a1
+  lea     UART_A_Queue, a1
 
   ; actually read the char
   bsr     VUBUG_MC68681_Getch
@@ -161,7 +162,7 @@ getch:
 lgch:
   ; save registers and set up the queue
   movem.l d1/a1, -(sp)
-  lea     (UART_B_Queue), a1
+  lea     UART_B_Queue, a1
 
   ; actually read the char
   bsr     VUBUG_MC68681_Getch

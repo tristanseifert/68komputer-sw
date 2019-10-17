@@ -110,14 +110,16 @@ iloc    =       $0002
         org     $3c
         dc.l    ghlr                    ;uninitialized iterrupt
         org     $60
-        dc.l    ghlr                    ;spurious iterrupt
-        dc.l    uav3                    ; irq1: unused
-        dc.l    IRQ_Lvl2                ; irq2: duart (RAM setting)
-        dc.l    uav3                    ;user auto-vectors
-        dc.l    uav4
-        dc.l    uav5
-        dc.l    uav6
-        dc.l    uav7
+
+        dc.l    IRQ_Unused                    ;spurious iterrupt
+        dc.l    IRQ_Unused                    ; irq1: unused
+        dc.l    VUBUG_MC68681_ISR       ; irq2: DUART
+        dc.l    IRQ_Unused                    ;user auto-vectors
+        dc.l    IRQ_Unused
+        dc.l    IRQ_Unused
+        dc.l    IRQ_Unused
+        dc.l    IRQ_Unused
+
         dc.l    texit                   ;exit
         dc.l    tgetb                   ;getb
         dc.l    tgetw                   ;getw
@@ -373,15 +375,15 @@ slp2:   move.l  #0,(a0)+
         dbf     d0,slp2
 
 done:
-        ; setup is done. enable IRQs, and output the header/version
-        move.w  ssri,sr                 ;enable interrupts at CPU
-        lea     howdy,a0                ;say hello
-        bsr     writs
+  ; setup is done. enable IRQs, and output the header/version
+  move.w  ssri,sr                 ;enable interrupts at CPU
+  lea     howdy,a0                ;say hello
+  bsr     writs
 
-        ; enable receiving characters here (TODO)
+  ; enable receiving characters here (TODO)
 
-        bset    #$00,echo               ;turn on terminal echo
-        bra     comm                    ;enter command loop
+  bset    #$00,echo               ;turn on terminal echo
+  bra     comm                    ;enter command loop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -389,23 +391,23 @@ done:
 ; passed in d0 to tty. (UART A)
 ;
 writ:
-        btst    #0, ctrls               ; Is ctrl-s active
-        beq     .doWrite                ; no, so write character
+  btst    #0, ctrls               ; Is ctrl-s active
+  beq     .doWrite                ; no, so write character
 
-        stop    #$2000                  ; yes, so wait on next character
-        bra     writ                    ; when awakened try to write the char
+  stop    #$2000                  ; yes; wait until next int
+  bra     writ                    ; when awakened check again
 
 .doWrite:
-        ; write character to DUART
-        move.b  d0,(MC68681_Base+MC68681_W_THRA)
+  ; write character to DUART
+  move.b  d0,(MC68681_Base+MC68681_W_THRA)
 
-        ; then, wait for tx to complete
+  ; then, wait for tx to complete
 .wait:
-        ; read the status register, check TXRDY bit (2), loop while clear
-        move.b  (MC68681_Base+MC68681_R_SRA), d0
-        btst    #2, d0
-        beq     .wait
-        rts
+  ; read the status register, check TXRDY bit (2), loop while clear
+  move.b  (MC68681_Base+MC68681_R_SRA), d0
+  btst    #2, d0
+  beq     .wait
+  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -413,62 +415,104 @@ writ:
 ; passed in d0 to serial port (UART B)
 ;
 writu:
-        ; write character to DUART
-        move.b  d0,(MC68681_Base+MC68681_W_THRB)
+  ; write character to DUART
+  move.b  d0,(MC68681_Base+MC68681_W_THRB)
 
-        ; then, wait for tx to complete
+  ; then, wait for tx to complete
 .wait:
-        move.b  (MC68681_Base+MC68681_R_SRB), d0
-        btst    #2, d0
-        beq     .wait
-        rts
+  move.b  (MC68681_Base+MC68681_R_SRB), d0
+  btst    #2, d0
+  beq     .wait
+  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Generalized routine to write a string which
 ; must terminate in a null (goes to UART A/tty)
 ;
-writs:  move.b  (a0)+,d0                ;a0 is address of string
-        beq     dwrts
+writs:
+  ; get character of string, exit if null
+  move.b  (a0)+, d0                ;a0 is address of string
+  beq     .end
 
-        bsr     writ
-        bra     writs
+  ; write the char and check the next one
+  bsr     writ
+  bra     writs
 
-dwrts:  rts
+.end:
+  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ;Generalized routine to write
 ;a word, byte or long word. (goes to UART A/tty)
 ;
-writb:  move.w  #$1,t1                  ;t1 is the number of bytes
-        bra     wr
-writw:  move.w  #$3,t1
-        bra     wr
-writl:  move.w  #$7,t1
-wr:     movem.l #$6082,-(a7)            ;save registers d1,d2,a0,a6
-        move.w  t1,d2                   ;set count
-        move.b  #$00,t5+1               ;set a null at end
-        lea     t5+1,a6                 ;use temps as a stack
-alp:    move.b  d0,d1                   ;make each hex digit a
-        and.b   #$0f,d1                 ;writable ascii byte
-        cmp.b   #$0a,d1                 ;check for abcdef
-        blt     or3
-        or.b    #$40,d1
-        sub.b   #$09,d1
-        bra     m1
-or3:    or.b    #$30,d1                 ;set high-order bits
-m1:     move.b  d1,-(a6)                ;put on stack
-        lsr.l   #$4,d0                  ;get next hex digit
-        dbf     d2,alp
-        movea.w a6,a0                   ;write the stack with writs
-        bsr     writs
-        movem.l (a7)+,#$4106            ;restore registers d1,d2,a0,a6
-        rts
+writb:
+  move.w  #$1, t1                  ;t1 is the number of bytes
+  bra     wr
+
+writw:
+  move.w  #$3, t1
+  bra     wr
+
+writl:
+  move.w  #$7, t1
+  ; fall through to wr
+
+
+wr:
+  movem.l d1-d2/a0/a6, -(sp)
+
+  ; get the count set above, null terminate the string and set it as a stack
+  move.w  (t1), d2
+
+  lea     t5+1, a6
+  move.b  #0, (a6)
+
+alp:
+  ; convert each hex digit to an ASCII byte
+  move.b  d0, d1
+  and.b   #$0f, d1
+
+  ; is it A-F?
+  cmp.b   #$0a, d1
+  blt     or3
+
+  ; yeah, format it as such
+  or.b    #$40, d1
+  sub.b   #$09, d1
+  bra     m1
+
+  ; handle it being a number
+or3:
+  or.b    #$30, d1
+
+  ; push that ASCII character onto our "string stack"
+m1:
+  move.b  d1, -(a6)
+  lsr.l   #4, d0
+
+  ; continue til we're out of nybbles
+  dbf     d2, alp
+
+  ; then, write that string to the terminal
+  movea.w a6, a0
+  bsr     writs
+
+  ; restore regs
+  movem.l (sp)+, d1-d2/a0/a6
+  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; include any of our hardware glue
         include "hw_glue.68k"
+
+        dc.b    "Kushblunt, tasty!"
+        even
+
+; unused IRQ
+IRQ_Unused:
+  rte
 
 ; IRQ handler that forwards to RAM
 IRQ_Lvl2:
@@ -590,19 +634,18 @@ IRQ_Lvl2:
 ; Rstrt - restart from control c
 ;
 VUBUG_Restart:
-        ; restore all the registers we backed up earlier
-        movem.l (sp)+, d0-d1 ; from VUBUG_MC68681_ISR
-        move.l  (sp)+, a0 ; from IRQ_Lvl2
+    ; restore all the registers we backed up earlier
+    movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
 
-        ; build a "fake" exception return frame
-        movem.l #$ffff,dr0              ;save registers d0-a7
-        move.l  usp,a0                  ;save user stack pointer
-        move.l  a0,ar7
-        move.w  (a7)+,_sr               ;save status register from stack
-        move.l  (a7)+,_pc               ;save program counter from stack
-        pea     comm                    ;fake a return to command loop
-        move.w  ssri,-(a7)              ;fake a new status register
-        rte
+    ; build a "fake" exception return frame
+    movem.l #$ffff,dr0              ;save registers d0-a7
+    move.l  usp,a0                  ;save user stack pointer
+    move.l  a0,ar7
+    move.w  (a7)+,_sr               ;save status register from stack
+    move.l  (a7)+,_pc               ;save program counter from stack
+    pea     comm                    ;fake a return to command loop
+    move.w  ssri,-(a7)              ;fake a new status register
+    rte
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -620,69 +663,85 @@ crlf:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Generalized number fetcher (from TTY/UART A)
+; Generalized number fetcher (place in a0 the routine to use for reading)
 ;
-getb:   move.w  #$1,t1                  ;t1 is byte count
-        bra     gb
-getw:   move.w  #$3,t1
-        bra     gb
-getl:   move.w  #$7,t1
-gb:     movem.l #$6000,-(a7)            ;save registers d1,d2
-        move.w  t1,d2
-        moveq   #$0,d1
-blp:    jsr     (a0)                    ;a0 is address of which..
-                                        ;routine to use for getting, i.e.
-                                        ;serial or terminal port
-        cmp.b   #$3a,d0                 ;check for abcdef
-        blt     n1
-        add.b   #$09,d0
-n1:     and.b   #$0f,d0
-        asl.l   #$4,d1                  ;place in next hex didgit
-        or.b    d0,d1
-        dbf     d2,blp
-        move.l  d1,d0                   ;setup return in d0
-        movem.l (a7)+,#$0006            ;restore registers d1,d2
-        rts
+getb:
+  move.w  #1, t1
+  bra     gb
+
+getw:
+  move.w  #3, t1
+  bra     gb
+
+getl:
+  move.w  #7, t1
+
+
+gb:
+  ; save registers, and restore our counter
+  movem.l d1-d2, -(a7)
+  move.w  t1, d2
+  moveq   #0, d1
+
+blp:
+  ; call the input routine
+  jsr     (a0)
+
+  ; is it A-F?
+  cmp.b   #$3a, d0
+  blt     n1
+  add.b   #$09, d0
+
+n1:
+  and.b   #$0f, d0
+  asl.l   #$4, d1                  ;place in next hex didgit
+  or.b    d0, d1
+  dbf     d2, blp
+  move.l  d1, d0                   ;setup return in d0
+
+  ; restore registers
+  movem.l (a7)+, d1-d2
+  rts
 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; command interpreter
+; command interpreter. each entry is 6 bytes
 ;
 CommandTable:
   dc.w    $4d00           ;m - memory update
-  dc.w    mem
+  dc.l    mem
   dc.w    $4c00           ;l - load from host (S-format)
-  dc.w    load
+  dc.l    load
   dc.w    $0c00           ;ctrl-l - load from host (S-format)
-  dc.w    lnoof
+  dc.l    lnoof
   dc.w    $5500           ;u - upload program from terminal port
-  dc.w    uload
+  dc.l    uload
   dc.w    $4400           ;d - dump contents of memory
-  dc.w    dump
+  dc.l    dump
   dc.w    $5300           ;s - single step
-  dc.w    singl
+  dc.l    singl
   dc.w    $5400           ;t - trace a program's path
-  dc.w    trace
+  dc.l    trace
   dc.w    $4700           ;g - start user program
-  dc.w    go
+  dc.l    go
   dc.w    $0d00           ;<cr> - short g command
-  dc.w    ggo
+  dc.l    ggo
   ; dc.w    $4500           ;e - enter terminal emulator mode
-  ; dc.w    emul
+  ; dc.l    emul
   dc.w    $4200           ;b - set/remove breakpoints
-  dc.w    bkpt
+  dc.l    bkpt
   dc.w    $4300           ;c - copy memory blocks
-  dc.w    copy
+  dc.l    copy
   dc.w    $5200           ;r - display/modify registers
-  dc.w    regs
+  dc.l    regs
   dc.w    $5000           ;p - prototype commands
-  dc.w    proto
+  dc.l    proto
   dc.w    $4800           ;h - display help messages
-  dc.w    help
+  dc.l    help
   dc.w    $4100           ;a - assembly listing
-  dc.w    assem
+  dc.l    assem
 CommandTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -703,13 +762,13 @@ comm:
   bsr     getch
   and.b   #$5f, d0
 
-  lea     CommandTable-4, a2
+  lea     CommandTable-6, a2
   ; moveq   #$0e, d2
-  moveq   #((CommandTable_End-CommandTable)/4)-1, d2
+  moveq   #((CommandTable_End-CommandTable)/6)-1, d2
 
 clp:
   ; advance to the next slot
-  addq.w  #4,a2
+  addq.w  #6, a2
 
   ; does the character match?
   cmp.b   com(a2), d0
@@ -719,7 +778,7 @@ clp:
   bne     .BadCommand
 
   ; get the address of the routine and jump to it
-  movea.w code(a2), a2
+  movea.l code(a2), a2
   jsr     (a2)
   bra     comm
 

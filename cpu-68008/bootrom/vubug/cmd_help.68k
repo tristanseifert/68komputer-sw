@@ -98,23 +98,23 @@ hlpl1:  dc.b   " Load is invoked as follows:"
         dc.b    "      u xxxx - load from terminal with offset xxxx"
         dc.b    cr,lf,nul
 
-hlpe:   dc.b   " E - Enter terminal emulator mode"
-        dc.b    cr,lf,nul
-hlpe1:  dc.b   " Invoke emulator mode as follows"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "       e"
-        dc.b    cr,lf
-        dc.b   "    NOTE: That in this mode any character except"
-        dc.b    cr,lf
-        dc.b   "    a ctrl-x may be sent to the host. Ctrl-x is the"
-        dc.b    cr,lf
-        dc.b   "    escape sequence for getting out of terminal emulator"
-        dc.b    cr,lf
-        dc.b   "    mode. Ctrl-l does the same thing except a load (l)"
-        dc.b    cr,lf
-        dc.b   "    command is put in the command buffer."
-        dc.b    cr,lf,nul
+; hlpe:   dc.b   " E - Enter terminal emulator mode"
+;         dc.b    cr,lf,nul
+; hlpe1:  dc.b   " Invoke emulator mode as follows"
+;         dc.b    cr,lf
+;         dc.b    cr,lf
+;         dc.b   "       e"
+;         dc.b    cr,lf
+;         dc.b   "    NOTE: That in this mode any character except"
+;         dc.b    cr,lf
+;         dc.b   "    a ctrl-x may be sent to the host. Ctrl-x is the"
+;         dc.b    cr,lf
+;         dc.b   "    escape sequence for getting out of terminal emulator"
+;         dc.b    cr,lf
+;         dc.b   "    mode. Ctrl-l does the same thing except a load (l)"
+;         dc.b    cr,lf
+;         dc.b   "    command is put in the command buffer."
+;         dc.b    cr,lf,nul
 
 hlpp:   dc.b   " P - Prototype commands in RAM"
         dc.b    cr,lf,nul
@@ -148,9 +148,9 @@ hlpd1:  dc.b   "    dump is invoked as follows:"
         dc.b    cr,lf
         dc.b   "    d<cr> - dump the next 64 bytes from last examined location"
         dc.b    cr,lf
-        dc.b   "    d xxxx<cr> - dump the next 64 bytes from address xxxx"
+        dc.b   "    d xxxxxxxx<cr> - dump the next 64 bytes from address xxxxxxxx"
         dc.b    cr,lf
-        dc.b   "    d xxxx,yyyy - dump the bytes between xxxx and yyyy"
+        dc.b   "    d xxxxxxxx,yyyyyyyy - dump the bytes between xxxxxxxx and yyyyyyyy"
         dc.b    cr,lf,nul
 
 hlpa:   dc.b   " A - Assembly listing"
@@ -196,35 +196,38 @@ hlpg1:  dc.b   " Invoke go as follows:"
         dc.b    cr,lf
         dc.b   "      g xxxx - go from address xxxx "
         dc.b    cr,lf,nul
+        even
 
-htab:   dc.w    $4800           ;h - help
-        dc.w    hlph,hlph1
-        dc.w    $4d00           ;m - memory
-        dc.w    hlpm,hlpm1
-        dc.w    $4c00           ;l - load
-        dc.w    hlpl,hlpl1
-        dc.w    $5500           ;u - upload
-        dc.w    hlpu,hlpl1
-        dc.w    $4400           ;d - dump
-        dc.w    hlpd,hlpd1
-        dc.w    $5300           ;s - single step
-        dc.w    hlps,hlps1
-        dc.w    $5400           ;t - trace program
-        dc.w    hlpt,hlpt1
-        dc.w    $4700           ;g - start user program
-        dc.w    hlpg,hlpg1
-        dc.w    $4500           ;e - emulate mode
-        dc.w    hlpe,hlpe1
-        dc.w    $4200           ;b - breakpoints
-        dc.w    hlpb,hlpb1
-        dc.w    $4300           ;c - copy
-        dc.w    hlpc,hlpc1
-        dc.w    $5200           ;r - register modify
-        dc.w    hlpr,hlpr1
-        dc.w    $5000           ;p - prototype commands
-        dc.w    hlpp,hlpp1
-        dc.w    $4100           ;a - assembly listing
-        dc.w    hlpa,hlpa1
+HelpTable:
+  dc.w    $4800           ;h - help
+  dc.w    hlph,hlph1
+  dc.w    $4d00           ;m - memory
+  dc.w    hlpm,hlpm1
+  dc.w    $4c00           ;l - load
+  dc.w    hlpl,hlpl1
+  dc.w    $5500           ;u - upload
+  dc.w    hlpu,hlpl1
+  dc.w    $4400           ;d - dump
+  dc.w    hlpd,hlpd1
+  dc.w    $5300           ;s - single step
+  dc.w    hlps,hlps1
+  dc.w    $5400           ;t - trace program
+  dc.w    hlpt,hlpt1
+  dc.w    $4700           ;g - start user program
+  dc.w    hlpg,hlpg1
+  ; dc.w    $4500           ;e - emulate mode
+  ; dc.w    hlpe,hlpe1
+  dc.w    $4200           ;b - breakpoints
+  dc.w    hlpb,hlpb1
+  dc.w    $4300           ;c - copy
+  dc.w    hlpc,hlpc1
+  dc.w    $5200           ;r - register modify
+  dc.w    hlpr,hlpr1
+  dc.w    $5000           ;p - prototype commands
+  dc.w    hlpp,hlpp1
+  dc.w    $4100           ;a - assembly listing
+  dc.w    hlpa,hlpa1
+HelpTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -238,15 +241,15 @@ help:   bsr     getch           ;get argument
         bne     htopic          ;no, so decode topic
 hall:   bsr     crlf
         bsr     crlf
-        moveq   #$0d,d1         ;load total # topics - 1
-        lea     htab+2,a1       ;load location of short help
+        moveq   #((HelpTable_End-HelpTable)/6)-1,d1         ;load total # topics - 1
+        lea     HelpTable+2,a1       ;load location of short help
 shlp:   movea.w (a1),a0         ;copy help location to a0
         bsr     writs           ;write a short help message
         addq.w  #$06,a1         ;increment to next help message
         dbf     d1,shlp         ;if not last message, print another one
         rts
-htopic: lea     htab,a1         ;set up search of ctab
-        moveq   #$0d,d1         ;load total # topics - 1
+htopic: lea     HelpTable,a1         ;set up search of ctab
+        moveq   #((HelpTable_End-HelpTable)/6)-1,d1         ;load total # topics - 1
 lhlp:   cmp.b   (a1),d0         ;is the topic equal to the table value?
         beq     hprn            ;if so, print the short and long helps
         addq.w  #$06,a1         ;else go to the next table location

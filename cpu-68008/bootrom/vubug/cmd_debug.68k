@@ -179,10 +179,10 @@ brts:   rts
 ;*                                       *
 ;*    d<cr> - dump the next 64 bytes from*
 ;*            last examined location     *
-;*    d xxxx<cr> - dump the next 64 bytes*
-;*                 from address xxxx     *
-;*    d xxxx,yyyy - dump the bytes bet-  *
-;*                  ween xxxx and yyyy   *
+;*    d xxxxxxxx<cr> - dump the next 64 bytes*
+;*                 from address xxxxxxxx     *
+;*    d xxxxxxxx,yyyyyyyy - dump the bytes bet-  *
+;*                  ween xxxxxxxx and yyyyyyyy   *
 ;*                                       *
 ;*****************************************
 ;
@@ -190,28 +190,31 @@ dmes:   dc.b    lf,lf,cr
         dc.b    "Memory dump"
         dc.b    lf,cr,nul
 dhed:   dc.b    lf,cr
-        dc.b    "      0  1  2  3"
-        dc.b    "  4  5  6  7  8  9  a"
-        dc.b    "  B  C  d  E  F"
+        dc.b    "      0  1  2  3  4  5  6  7  8  9  a  B  C  d  E  F"
 dcr:    dc.b    lf,cr,nul
+
 dump:   lea     getch,a0                ;set for terminal input
         bsr     getch                   ;get delimiter
         cmp.b   #$0d,d0                 ;if <cr> then dump from pointer
         bne     dexam                   ;else get address
+
         movea.w exam,a1                 ;get exam
         movea.w a1,a2                   ;save it for ending address
         adda.w  #$40,a2                 ;add 64 for length of dump
         bra     dgo                     ;go do it
-dexam:  bsr     getw                    ;get starting address
+
+dexam:  bsr     getl                    ;get starting address
         movea.w d0,a1
         bsr     getch                   ;get delimiter
         cmp.b   #$2c,d0                 ;if , the get ending address
         bne     dcom
-        bsr     getw                    ;get address
+        bsr     getl                    ;get address
         movea.w d0,a2                   ;save it
         bra     dgo                     ;go dump
+
 dcom:   movea.w a1,a2                   ;default to 64 byte dump
         adda.w  #$40,a2
+
 dgo:    lea     dmes,a0                 ;do the dump
         bsr     writs
         lea     dhed,a0                 ;print header
