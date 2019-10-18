@@ -2,7 +2,6 @@
 ; Displays an assembly listing of a region of memory. This is basically a full
 ; disassembler.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; assem - assembly listing
 ;
@@ -13,50 +12,53 @@
 ;*      a<cr> - disassemble the next    *
 ;*              20 instructions from    *
 ;*              last examined location  *
-;*      a xxxx<cr> - disassemble 20     *
-;*              instructions from xxxx  *
-;*      a xxxx,yyyy - disassemble all   *
-;*              instructions from xxxx  *
-;*              to yyyy                 *
+;*      a xxxxxxxx<cr> - disassemble 20     *
+;*              instructions from xxxxxxxx  *
+;*      a xxxxxxxx,yyyyyyyy - disassemble all   *
+;*              instructions from xxxxxxxx  *
+;*              to yyyyyyyy                 *
 ;*                                      *
 ;****************************************
 
 ames:   dc.b    lf,lf,cr
-        dc.b    "assembly listing:"
+        dc.b    "Assembly listing:"
         dc.b    lf,cr,nul,nul
 assem:  lea     getch,a0        ;set for terminal input
         bsr     getch           ;get delimiter
         cmp.b   #$0d,d0         ;if <cr> then list from pointer
         bne     aexam           ;else get address
-        movea.w exam,a1         ;get exam
+        movea.l exam,a1         ;get exam
         lea     ames,a0         ;write message
         bsr     writs
         move.b  #$13,d2         ;load 19 into d2
 ass20:  bsr     ass1            ;list a single instruction
         dbf     d2,ass20        ;if not finished, decrement and go again
-        move.w  a1,exam         ;save new examination pointer
+        move.l  a1,exam         ;save new examination pointer
         rts
-aexam:  bsr     getw            ;get starting address
-        movea.w d0,a1
+aexam:  bsr     InHex_Long            ;get starting address
+        movea.l d0,a1
         bsr     getch           ;get delimiter
         cmpi.b  #$2c,d0         ;if , then get ending address
         bne     acom
-        bsr     getw            ;get address
-        move.w  d0,aend         ;save it
+        bsr     InHex_Long            ;get address
+        move.l  d0,aend         ;save it
+
         lea     ames,a0         ;write message
         bsr     writs
+
 assxy:  bsr     ass1            ;list a single instruction
-        cmpa.w  aend,a1         ;reached the end of the range yet?
+        cmpa.l  aend,a1         ;reached the end of the range yet?
         ble     assxy           ;if not, do it again
-        move.w  a1,exam         ;save new examination pointer
+        move.l  a1,exam         ;save new examination pointer
         rts
+
 acom:   lea     ames,a0         ;write message
         bsr     writs
         move.b  #$13,d2         ;load 19 into d2
         bra     ass20           ;jump to dump 20 routine
 
-ass1:   move.w  a1,d0           ;load the address
-        bsr     writw           ;print it out
+ass1:   move.l  a1,d0           ;load the address
+        bsr     OutHex_Address           ;print it out
         bsr     spc
         bsr     spc
         move.w  (a1)+,d0        ;load the instruction word
@@ -98,7 +100,7 @@ gr0:    move.w  d1,d0
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load the operand
-        bsr     writb           ;write it
+        bsr     OutHex_Byte           ;write it
         bsr     comma
         lea     mccr,a0         ;load "ccr"
         bsr     writs
@@ -111,7 +113,7 @@ ANDIsr: cmpi.w  #$027c,d0       ;is it ANDIsr?
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load the operand
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bsr     comma
         lea     msr,a0          ;load "sr"
         bsr     writs
@@ -124,7 +126,7 @@ EORIcr: cmpi.w  #$0a3c,d0       ;is it EORIccr?
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load the operand
-        bsr     writb           ;write it
+        bsr     OutHex_Byte           ;write it
         bsr     comma
         lea     mccr,a0         ;load "ccr"
         bsr     writs
@@ -137,7 +139,7 @@ EORIsr: cmpi.w  #$0a7c,d0       ;is it EORIsr?
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load the operand
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bsr     comma
         lea     msr,a0          ;load "sr"
         bsr     writs           ;write it
@@ -150,7 +152,7 @@ ORIccr: cmpi.w  #$003c,d0       ;is it ORIccr?
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load the operand
-        bsr     writb           ;write it
+        bsr     OutHex_Byte           ;write it
         bsr     comma
         lea     mccr,a0         ;load "ccr"
         bsr     writs
@@ -163,7 +165,7 @@ ORIsr:  cmpi.w  #$007c,d0       ;is it ORIsr?
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load the operand
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bsr     comma
         lea     msr,a0          ;load "sr"
         bsr     writs
@@ -214,15 +216,15 @@ lops:   bsr     dot
         cmpi.b  #$62,siz        ;is byte?
         bne     iopsw           ;no
         move.w  (a1)+,d0        ;yes
-        bsr     writb
+        bsr     OutHex_Byte
         bra     iopsc
 iopsw:  cmpi.b  #$77,siz        ;is word?
         bne     iopsl           ;no
         move.w  (a1)+,d0        ;yes
-        bsr     writw
+        bsr     OutHex_Word
         bra     iopsc
 iopsl:  move.l  (a1)+,d0        ;size long
-        bsr     writl
+        bsr     OutHex_Long
 iopsc:  bsr     comma
         move.w  d1,d0
         bsr     writea          ;write the operand
@@ -253,7 +255,7 @@ moveps: bsr     spc
         bsr     comma
         bsr     lparen
         move.w  (a1)+,d0
-        bsr     writw           ;write the address
+        bsr     OutHex_Word           ;write the address
         bsr     comma
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask address reg
@@ -263,7 +265,7 @@ moveps: bsr     spc
 movepr: move.w  d1,d0
         bsr     lparen
         move.w  (a1)+,d0
-        bsr     writw           ;write the address
+        bsr     OutHex_Word           ;write the address
         bsr     comma
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask address reg
@@ -304,7 +306,7 @@ bitop2: bsr     spc
         bsr     pound
         move.w  (a1)+,d0        ;get the bit number
         andi.b  #$07,d0         ;modulo 8
-        bsr     writb           ;write it
+        bsr     OutHex_Byte           ;write it
         bsr     comma
         move.w  d1,d0
         bsr     writea          ;write the destination operand
@@ -394,7 +396,7 @@ STOP:   cmpi.w  #$4e72,d0       ;is it STOP?
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load data word
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bra     disend
 TRAPV:  cmpi.w  #$4e76,d0       ;is it TRAPV?
         bne     JMP             ;no
@@ -612,7 +614,7 @@ LINK:   move.w  d1,d0
         bsr     pound
         bsr     dollar
         move.w  (a1)+,d0        ;load displacement
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bra     disend
 MOVEsp: move.w  d1,d0
         andi.w  #$fff0,d0       ;mask off operand bits
@@ -649,7 +651,7 @@ TRAP:   move.w  d1,d0
         bsr     dollar
         move.b  d1,d0
         andi.b  #$0f,d0         ;mask off trap number
-        bsr     writb           ;write it
+        bsr     OutHex_Byte           ;write it
         bra     disend
 SWAP:   move.w  d1,d0
         andi.w  #$fff8,d0       ;mask off operand if SWAP
@@ -765,7 +767,7 @@ MOVEMo: move.w  d1,d0
         bne     MOVEMr          ;to reg
         bsr     dollar
         move.w  (a1)+,d0        ;load the reg list
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bsr     comma
         move.w  d1,d0
         bsr     writea          ;write the address
@@ -776,7 +778,7 @@ MOVEMr: move.w  (a1)+,t1        ;save the reg list
         bsr     comma
         bsr     dollar
         move.w  t1,d0           ;reload the reg list
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bra     disend
 ILLEG:  lea     mILLEG,a0       ;yes, print
         bsr     writs           ;write it
@@ -860,7 +862,7 @@ qwrit:  bsr     writs           ;write it
         rol.w   #$07,d0         ;get into rightmost bits
         bne     q8              ;if nonzero, range is 1-7
         move.b  #$08,d0         ;if zero, range is 8
-q8:     bsr     writb           ;write byte
+q8:     bsr     OutHex_Byte           ;write byte
         bsr     comma
         move.w  d1,d0
         bsr     writea          ;write dest
@@ -895,7 +897,7 @@ gr7:    move.w  d1,d0
         bsr     pound
         bsr     dollar
         move.b  d1,d0           ;load data
-        bsr     writb           ;write it
+        bsr     OutHex_Byte           ;write it
         bsr     comma
         move.w  d1,d0
         andi.w  #$0e00,d0       ;mask off the reg bits
@@ -1294,7 +1296,7 @@ immsh:  bsr     spc
         rol.w   #$07,d0         ;get into rightmost bits
         bne     sh17            ;if not zero, 1-7 bit shift
         move.b  #$08,d0         ;if zero, 8 bit shift
-sh17:   bsr     writb           ;write it
+sh17:   bsr     OutHex_Byte           ;write it
         bsr     comma
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask the reg bits
@@ -1493,7 +1495,7 @@ mode5:  cmpi.b  #$28,d0         ;is it reg indirect w/ displacement?
         bne     mode6           ;no
         bsr     dollar
         move.w  (a1)+,d0        ;yes, so load 16 bit displacement
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bsr     lparen
         move.b  writm,d0
         andi.b  #$07,d0         ;mask reg number
@@ -1504,7 +1506,7 @@ mode6:  cmpi.b  #$30,d0         ;is it reg indirect w/ index?
         bne     mode7           ;no
         bsr     dollar
         move.w  (a1),d0         ;load the index word
-        bsr     writb           ;write the 8 bit displacement
+        bsr     OutHex_Byte           ;write the 8 bit displacement
         bsr     lparen
         move.b  writm,d0
         andi.b  #$07,d0         ;mask reg number
@@ -1536,19 +1538,19 @@ mode7:  move.b  writm,d0        ;mode seven, so decode reg number
         bne     m71             ;if zero, absolute.w
         bsr     dollar
         move.w  (a1)+,d0        ;move the address into d0
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bra     eaout
 m71:    cmpi.b  #$01,d0         ;is it absolute.l?
         bne     m72             ;no
         bsr     dollar
         move.l  (a1)+,d0        ;yes, so move the address into d0
-        bsr     writl           ;write it
+        bsr     OutHex_Long           ;write it
         bra     eaout
 m72:    cmpi.b  #$02,d0         ;is it relative w/ displacement?
         bne     m73             ;no
         bsr     dollar
         move.w  (a1)+,d0        ;yes, so load displacement into d0
-        bsr     writw           ;write it
+        bsr     OutHex_Word           ;write it
         bsr     lparen
         lea     mPC,a0          ;load "PC"
         bsr     writs           ;write it
@@ -1558,7 +1560,7 @@ m73:    cmpi.b  #$03,d0         ;is it relative w/ index?
         bne     m74             ;no
         bsr     dollar
         move.w  (a1),d0         ;load the index word
-        bsr     writb           ;write the 8 bit displacement
+        bsr     OutHex_Byte           ;write the 8 bit displacement
         bsr     lparen
         lea     mPC,a0          ;load "PC"
         bsr     writs           ;write it
@@ -1572,15 +1574,15 @@ m74:    cmpi.b  #$04,d0         ;is it immediate?
         cmpi.b  #$62,d0         ;is it byte data?
         bne     m74w            ;no
         move.w  (a1)+,d0        ;yes, so load immediate data
-        bsr     writb           ;write byte data
+        bsr     OutHex_Byte           ;write byte data
         bra     eaout
 m74w:   cmpi.b  #$77,d0         ;is it word data?
         bne     m74l            ;no
         move.w  (a1)+,d0        ;yes, so load immediate data
-        bsr     writw           ;write word data
+        bsr     OutHex_Word           ;write word data
         bra     eaout
 m74l:   move.l  (a1)+,d0        ;load long immediate data
-        bsr     writl           ;write long data
+        bsr     OutHex_Long           ;write long data
         bra     eaout
 m75:    lea     mIAM,a0         ;load illegal mode message
         bsr     writs           ;write it
@@ -1597,11 +1599,11 @@ wdis:   swap    d0              ;save opcode in upper 16 so we can
         ext.l   d0              ;to word size
         add.l   d0,d1           ;add 8-bit displacement to address
         move.l  d1,d0           ;copy into d0
-        bsr     writl           ;write address
+        bsr     OutHex_Long           ;write address
         bra     wdiso
 wdisw:  move.w  (a1)+,d0        ;load the displacement word
         ext.l   d0              ;sign extend it
         add.l   d0,d1           ;add displacement
         move.l  d1,d0           ;copy to d0
-        bsr     writl
+        bsr     OutHex_Long
 wdiso:  rts

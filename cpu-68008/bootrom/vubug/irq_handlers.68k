@@ -4,9 +4,6 @@
 ;
 ; Generic trap handler
 ;
-ghmes:  dc.b    lf,cr
-        dc.b    "Trap at ", nul
-        dc.b    nul
 ghlr:   movem.l #$ffff,dr0              ;save all registers d0-a7
         move.l  usp,a6                  ;get user stack pointer
         move.l  a6,ar7                  ;and save it
@@ -14,11 +11,24 @@ ghlr:   movem.l #$ffff,dr0              ;save all registers d0-a7
         move.l  (a7)+,_pc               ;save current return value
         pea     comm                    ;set for return to comm
         move.w  ssri,-(a7)              ;enable interrupts on return
-ghpr:   lea     ghmes,a0                ;wx message
-ghpr1:  bsr     writs
-        move.l  _pc,d0
-        bsr     writl
-        rte
+
+ghpr:
+  lea     Trap_WriteMsgWithPc_MsgTrap, a0
+
+Trap_WriteMsgWithPc:
+  bsr     writs
+
+; ghpr1:  bsr     writs
+
+  ; print PC
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+  rte
+
+Trap_WriteMsgWithPc_MsgTrap:
+  dc.b    lf,cr
+  dc.b    "Trap at ", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -28,37 +38,55 @@ bhmes:  dc.b    lf,cr
         dc.b    "Breakpoint at ", nul
 binin:  dc.b    lf,cr
         dc.b    "Bad Instruction at ", nul
-        dc.b    nul
-bhlr:   move.w  ssrn,sr                 ;disable interrupts
-        movem.l #$ffff,dr0              ;save registers d0-a7
-        move.l  usp,a6                  ;get and save user stack pointer
-        move.l  a6,ar7
-        move.w  (a7)+,_sr               ;save status register
-        move.l  (a7)+,_pc               ;save program counter
-        pea     comm                    ;set for return to comm
-        move.w  ssri,-(a7)              ;enable interrupts on return
-        movea.l _pc,a0                  ;get pc on interrupt
-        cmpi.w  #$ffff,(a0)             ;was interrupt caused by bkpt instruction ?
-        beq     bsnd                    ;Yes
-        lea     binin,a0                ;No, invalid instruction
-        bra     ghpr1                   ;go wx message
-bsnd:   lea     bhmes,a0                ;wx bkpt message
-        bsr     writs
-        move.l  _pc,d0
-        bsr     writw
-        bsr     crlf
-        lea     bktab-4,a1              ;find the breakpoint entry
-        move.l  #$4,d1                  ;maximum of 5
-        move.l  _pc,d0                  ;this is where it happened
-bhl:    adda.w  #$4,a1
-        cmp.w   iloc(a1),d0             ;is this the entry ?
-        dbeq    d1,bhl                  ;loop if not
-        bne     bhrte                   ;not found so quit
-        movea.w d0,a2                   ;point at it
-        move.w  instr(a1),(a2)          ;move instruction back in
-        ori.w   #$8000,_sr              ;set trace mode on
-        bset    #$0,bkptf               ;set in-bkpt flag
-bhrte:  rte
+        even
+
+bhlr:
+  move.w  ssrn,sr                 ;disable interrupts
+  movem.l #$ffff,dr0              ;save registers d0-a7
+  move.l  usp,a6                  ;get and save user stack pointer
+  move.l  a6,ar7
+  move.w  (a7)+,_sr               ;save status register
+  move.l  (a7)+,_pc               ;save program counter
+  pea     comm                    ;set for return to comm
+  move.w  ssri,-(a7)              ;enable interrupts on return
+  movea.l _pc,a0                  ;get pc on interrupt
+  cmpi.w  #$ffff,(a0)             ;was interrupt caused by bkpt instruction ?
+  beq     bsnd                    ;Yes
+  lea     binin,a0                ;No, invalid instruction
+
+  bra     Trap_WriteMsgWithPc                   ;go wx message
+
+bsnd:
+  ; write breakpoint message and address of PC
+  lea     bhmes, a0                ;wx bkpt message
+  bsr     writs
+  move.l  _pc, d0
+  bsr     OutHex_Address
+  bsr     crlf
+
+  ; search through the breakpoint table
+  lea     bktab-4, a1
+  moveq  #$4, d1
+  move.l  (_pc), d0
+
+.CheckBkpt:
+  adda.l  #$4, a1
+
+  ; compare the addresses
+  cmp.w   iloc(a1), d0
+  dbeq    d1, .CheckBkpt
+
+  ; did we find an entry?
+  bne     .Done
+
+  ; yup!
+  movea.w d0, a2
+  move.w  instr(a1), (a2)          ;move instruction back in
+  ori.w   #$8000, (_sr)              ;set trace mode on
+  bset    #0, (bkptf)               ;set in-bkpt flag
+
+.Done:
+  rte
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -95,10 +123,11 @@ treal:  move.l  $2(a7),_pc              ;Not (just) a bkpt but trace or single
         move.w  ssri,-(a7)              ;enable interrupts on return
 trpr:   lea     tlocm,a0                ;wx message
         bsr     writs
-        move.l  _pc,d0
-        bsr     writl
+
+        move.l  (_pc), d0
+        bsr     OutHex_Long
         bsr     crlf
-        move.l  _pc,a1                  ;load the current address
+        move.l  (_pc),a1                  ;load the current address
         bsr     ass1                    ;wx the disassembled instruction
 trte:   movea.l ar0,a0                  ;restore used registers
         move.l  dr0,d0
@@ -124,7 +153,7 @@ phlr:   movem.l #$ffff,dr0              ;regs d0-a7
         pea     comm
         move.w  ssri,-(a7)
 prpr:   lea     prmes,a0
-        bra     ghpr1
+        bra     Trap_WriteMsgWithPc
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -140,7 +169,7 @@ abhlr:  movem.l #$ffff,dr0              ;regs d0-a7
         pea     comm
         move.w  ssri,-(a7)
 abpr:   lea     abmes,a0
-        bra     ghpr1
+        bra     Trap_WriteMsgWithPc
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -163,34 +192,34 @@ texit:  movem.l #$ffff,dr0              ;save register values d0-a7
 ; Getb
 ;
 tgetb:  lea     getch,a0
-        bsr     getb
+        bsr     InHex_Byte
         rte
 ;
 ; Getw
 ;
 tgetw:  lea     getch,a0
-        bsr     getw
+        bsr     InHex_Word
         rte
 ;
 ; Getl
 ;
 tgetl:  lea     getch,a0
-        bsr     getl
+        bsr     InHex_Long
         rte
 ;
 ; Wrtb
 ;
-twrtb:  bsr     writb
+twrtb:  bsr     OutHex_Byte
         rte
 ;
 ; Wrtw
 ;
-twrtw:  bsr     writw
+twrtw:  bsr     OutHex_Word
         rte
 ;
 ; Wrtl
 ;
-twrtl:  bsr     writl
+twrtl:  bsr     OutHex_Long
         rte
 ;
 ; Getc

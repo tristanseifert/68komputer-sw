@@ -12,7 +12,7 @@
 ;*               offset                 *
 ;*       <ff> - same as l<cr> but used  *
 ;*              only exiting emulator   *
-;*       l xxxx - load with offset xxxx *
+;*       l xxxxxxxx - load with offset xxxxxxxx *
 ;*                                      *
 ;****************************************
 ;
@@ -28,7 +28,7 @@ load:   bsr     getch                   ;get delimiter
         cmp.b   #$0d,d0                 ;if <cr> then no offset
         beq     lnoof
         lea     getch,a0                ;get offset
-        bsr     getw
+        bsr     InHex_Word
         move.l  d0,_pc                  ;save load point for go command
         bra     ld1
 lnoof:  move.l  #$0,_pc
@@ -53,20 +53,20 @@ llp:    jsr     (a0)                    ;get S
         beq     ldone
         cmp.b   #$31,d0                 ;1 - then another record
         bne     llp
-        bsr     getb                    ;get byte count
+        bsr     InHex_Byte                    ;get byte count
         move.l  d0,d1
         subq.b  #$4,d1                  ;remove count for check
-        bsr     getw
+        bsr     InHex_Word
         add.l   _pc,d0                  ;add offset
         movea.w d0,a1                   ;save starting address
-lblp:   bsr     getb                    ;get actual data byte
+lblp:   bsr     InHex_Byte                    ;get actual data byte
         move.b  d0,(a1)+                ;move to memory
         dbf     d1,lblp                 ;loop for count
-        bsr     getw                    ;gobble up check and crlf
+        bsr     InHex_Word                    ;gobble up check and crlf
         bra     llp                     ;try another record
 ldone:  jsr     (a0)                    ;gobble up byte count
         jsr     (a0)
-        bsr     getw                    ;get address from end macro
+        bsr     InHex_Word                    ;get address from end macro
         add.l   _pc,d0                  ;add offset
         move.l  d0,d1                   ;save it
         move.l  d0,_pc                  ;set starting address for go
@@ -81,7 +81,7 @@ lreg:   move.l  #$0,(a1)+
         lea     slmes,a0                ;write message
         bsr     writs
         move.l  d1,d0
-        bsr     writw                   ;write starting address
+        bsr     OutHex_Word                   ;write starting address
         move.l  #$03,d1                 ;gobble up last four bytes
         movea.l a2,a0                   ;restore the port location to a0
 ll2:    jsr     (a0)
@@ -101,7 +101,7 @@ ll2:    jsr     (a0)
 ;*                                      *
 ;*       u<cr> - load from terminal     *
 ;*               with no offset         *
-;*       u xxxx - load with offset xxxx *
+;*       u xxxxxxxx - load with offset xxxxxxxx *
 ;*                                      *
 ;****************************************
 ;
@@ -109,7 +109,7 @@ uload:  bsr     getch                   ;same as above, except that it
         cmp.b   #$0d,d0                 ;uses the terminal port for the
         beq     ulnoof                  ;load.
         lea     getch,a0
-        bsr     getw
+        bsr     InHex_Long
         move.l  d0,_pc
         bra     uld1
 ulnoof: move.l  #$0,_pc

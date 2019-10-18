@@ -193,7 +193,7 @@ ar7:    dc.l    $00000000
 
 ptab:   dcb.w   $3,0000                 ;prototype table
 rexam:  dc.w    $0000                   ;register examination pointer
-exam:   dc.w    $0000                   ;memory examination pointer
+exam:   dc.l    $0000                   ;memory examination pointer
 
 t1:     dc.w    $0000                   ;temporary work area
 t2:     dc.w    $0000
@@ -209,7 +209,7 @@ bkptf   =       *-1                     ;breakpoint flag
 users:  dcb.w   $80,0000                ;users stack area
 ustck   =       *
 
-aend:   dc.w    $0000
+aend:   dc.l    $0000
 siz:    dc.w    $0000
 writm:  dc.w    $0000
 echo:   dc.w    $0000                   ;terminal port echo flag
@@ -332,43 +332,45 @@ start:
 
 ; set up buffers
 gwan:
-        ; clear both of our receive buffers
-        moveq   #0, d0
-        move.b  d0, (UART_Queue_WritePtr+UART_A_Queue)
-        move.b  d0, (UART_Queue_WritePtr+UART_B_Queue)
+  ; clear both of our receive buffers
+  moveq   #0, d0
+  move.b  d0, (UART_Queue_WritePtr+UART_A_Queue)
+  move.b  d0, (UART_Queue_WritePtr+UART_B_Queue)
 
-        lea     UART_Queue_Data+UART_A_Queue, a0
-        lea     UART_Queue_Data+UART_B_Queue, a1
-        move    #3, d1
+  lea     UART_Queue_Data+UART_A_Queue, a0
+  lea     UART_Queue_Data+UART_B_Queue, a1
+  move    #3, d1
 
 .Clear:
-        move.l  d0, (a0)+
-        move.l  d0, (a1)+
-        dbf     d1, .Clear
+  move.l  d0, (a0)+
+  move.l  d0, (a1)+
+  dbf     d1, .Clear
 
-        ; lea     ibuff,a1                ;setup buffers
-        ; move.w  #$0000,head(a1)
-        ; move.w  #$ffff,tail(a1)
-        ; move.w  #$0000,count(a1)
-        ; lea     lbuff,a1
-        ; move.w  #$0,head(a1)            ;set queue for lp
-        ; move.w  #$ffff,tail(a1)
-        ; move.w  #0,count(a1)
+  ; clear control variables
+  move.l  d0, (exam)
+  move.b  d0, (ctrls)
+  move.b  d0, (bkptf)
 
-        move.w  #0,exam                 ;initialize control variables
-        move.b  #0,ctrls
-        move.b  #0,bkptf
-        moveq   #$4,d0                  ;clear breakpoint table
-        lea     bktab,a1
-slp:    move.l  #0,(a1)+
-        dbf     d0,slp
+  ; clear the breakpoint table
+  moveq   #$4, d1
+  lea     bktab, a1
+
+.clearBkpt:
+  move.l  d0, (a1)+
+  dbf     d1, .clearBkpt
+
+  ; clear register save area
         move.w  #0,_sr                  ;clear register save area
         move.l  #$10,d0
         lea     _pc,a0
 slp1:   move.l  #0,(a0)+
         dbf     d0,slp1
+
+  ; set up user stack pointer
         lea     ustck,a0                ;set user stack pointer
         move.l  a0,ar7
+
+  ; clear system stack
         lea     sarea,a0                ;clear system stack
         moveq   #$3f,d0
 slp2:   move.l  #0,(a0)+
@@ -376,14 +378,15 @@ slp2:   move.l  #0,(a0)+
 
 done:
   ; setup is done. enable IRQs, and output the header/version
-  move.w  ssri,sr                 ;enable interrupts at CPU
-  lea     howdy,a0                ;say hello
+  move.w  ssri, sr
+  lea     howdy, a0
   bsr     writs
 
   ; enable receiving characters here (TODO)
 
-  bset    #$00,echo               ;turn on terminal echo
-  bra     comm                    ;enter command loop
+  ; turn on terminal echo and enter command loop
+  bset    #0, echo
+  bra     comm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -447,20 +450,27 @@ writs:
 ;Generalized routine to write
 ;a word, byte or long word. (goes to UART A/tty)
 ;
-writb:
+OutHex_Byte:
+; writb:
   move.w  #$1, t1                  ;t1 is the number of bytes
-  bra     wr
+  bra     OutHex
 
-writw:
+OutHex_Word:
+; writw:
   move.w  #$3, t1
-  bra     wr
+  bra     OutHex
 
-writl:
+OutHex_Address:
+  move.w  #$5, t1
+  bra     OutHex
+
+OutHex_Long:
+; writl:
   move.w  #$7, t1
   ; fall through to wr
 
 
-wr:
+OutHex:
   movem.l d1-d2/a0/a6, -(sp)
 
   ; get the count set above, null terminate the string and set it as a stack
@@ -469,34 +479,33 @@ wr:
   lea     t5+1, a6
   move.b  #0, (a6)
 
-alp:
+.convertNybble:
   ; convert each hex digit to an ASCII byte
   move.b  d0, d1
   and.b   #$0f, d1
 
   ; is it A-F?
   cmp.b   #$0a, d1
-  blt     or3
+  blt     .isNumber
 
   ; yeah, format it as such
-  or.b    #$40, d1
-  sub.b   #$09, d1
-  bra     m1
+  add.b   #$37, d1
+  bra     .writeChar
 
   ; handle it being a number
-or3:
-  or.b    #$30, d1
+.isNumber:
+  add.b   #$30, d1
 
   ; push that ASCII character onto our "string stack"
-m1:
+.writeChar:
   move.b  d1, -(a6)
   lsr.l   #4, d0
 
   ; continue til we're out of nybbles
-  dbf     d2, alp
+  dbf     d2, .convertNybble
 
   ; then, write that string to the terminal
-  movea.w a6, a0
+  movea.l a6, a0
   bsr     writs
 
   ; restore regs
@@ -521,112 +530,6 @@ IRQ_Lvl2:
   jsr     (a0)
   move.l  (sp)+, a0
   rte
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; XXX: this would be the "TTY"/UART A read character interrupt
-; TODO: make this work
-;
-; Interrupt handler for the keyboard
-; interrupt. It simply stashes the input
-; character in a buffer pointed to by a1.
-;
-; inint:  move.w  ssrn,sr                 ;disable interrupts
-;         movem.l #$e060,-(a7)            ;save registers d0,d1,d2,a1,a2
-;         move.b  ttyd,d1                 ;get the character
-;         andi.b  #$7f,d1                 ;mask out the parity, if any
-;         btst    #$3,bkptf               ;In emulator mode ?
-;         beq     incmp                   ;No, so continue
-;
-;         ; everything below is for terminal emulator move til incmp
-;         cmp.b   #$0c,d1                 ;ctrl-l ?
-;         beq     inld                    ;yes, so load
-;         cmp.b   #$18,d1                 ;No, is it a ctrl-x ?
-;         bne     inwru                   ;No, so write it
-; inld:   bclr    #$3,bkptf               ;Exit emulator mode
-;         lea     emudn,a1                ;set up return
-;         move.l  a1,$16(a7)              ;put return deep in stack
-;         cmp.b   #$0c,d1                 ;ctrl-l ?
-;         bne     out                     ;No
-;         bra     incmp                   ;check for ctrl-s or q
-; inwru:  move.b  d1,d0                   ;write to host
-;         bsr     writu
-;         bra     out
-;
-;         ; check for some control characters
-; incmp:  cmp.b   #$03,d1                 ;check for ctrl-c
-;         beq     rstrt
-;         cmp.b   #$13,d1                 ;check for ctrl-s
-;         bne     ctrlq
-;
-;         ; yes, ctrl+S is set; exit after
-;         move.b  #$1,ctrls
-;         bra     out
-;
-; ctrlq:  cmp.b   #$11,d1                 ;check for ctrl-q
-;         bne     c1
-;
-;         ; yes, ctrl+q is set; exit after
-;         move.b  #$0,ctrls
-;         bra     out
-;
-;         ; try to stuff it into the queue
-; c1:     lea     ibuff,a1                ;get buffer address
-;         cmpi.b  #$10,count(a1)          ;overflow ?
-;         blt     cont                    ;No
-;         bra     out                     ;Yes, so ignore character
-; cont:   addq.b  #$1,tail(a1)            ;add chacter to buffer
-;         addq.b  #$1,count(a1)           ;add 1 to count
-;         andi.b  #$0f,tail(a1)           ;modulo-16
-;         move.w  tail(a1),d2             ;get offset of new entry
-;         ror.w   #$08,d2                 ;in lower 8 bits of d2
-;         andi.w  #$ff,d2                 ;mask off what's left
-;         lea     queue(a1),a1            ;get address of queue
-;         move.b  d1,$0(a1,d2.w)          ;move byte into buffer
-;
-;         btst    #$00,echo               ;is the echo turned on?
-;         beq     out                     ;if not, skip the echo,
-;         move.b  d1,d0                   ;else setup for echo
-;         bsr     writ
-; out:    movem.l (a7)+,#$0607            ;reset registers d0,d1,a1,a2
-;         rte
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; XXX: this would be the serial/UART B read character interrupt
-; TODO: make this work
-;
-; Interrupt handler for the load port.
-; It stashes the character in the buffer
-; pointed to by a1.
-;
-; lpint:  move.w  ssrn,sr                 ;same as above but less complex
-;         movem.l #$e060,-(a7)            ;registers d0,d1,d2,a1,a2
-;         move.b  lpd,d1                  ; read char
-;         andi.b  #$7f,d1                 ; this masks the parity bit
-;         btst    #$3,bkptf               ; are we in terminal emulator mode
-;         beq     lplea                   ; nope, so exit
-;         move.b  d1,d0                   ; echo for emulator mode
-;         bsr     writ
-;         bra     lout
-;
-; lplea:  lea     lbuff,a1                ;queue a character
-;         ; is there space in the queue?
-;         cmpi.b  #$10,count(a1)
-;         blt     lcont
-;         ; nah, drop the character
-;         bra     lout
-;
-;         ; shove char into queue
-; lcont:  addq.b  #$1,tail(a1)
-;         addq.b  #$1,count(a1)
-;         andi.b  #$0f,tail(a1)
-;         move.w  tail(a1),d2
-;         ror.w   #$08,d2
-;         andi.w  #$ff,d2
-;         lea     queue(a1),a1
-;         move.b  d1,$0(a1,d2.w)
-;
-; lout:   movem.l (a7)+,#$0607            ;regs d0,d1,d2,a1,a2
-;         rte
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -658,26 +561,29 @@ crlf:
   rts
 
 .NewlineData:
-  dc.b    cr, lf, nul, nul
+  dc.b    cr, lf, nul
   even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Generalized number fetcher (place in a0 the routine to use for reading)
 ;
-getb:
+InHex_Byte:
+; getb:
   move.w  #1, t1
-  bra     gb
+  bra     InHex
 
-getw:
+InHex_Word:
+; getw:
   move.w  #3, t1
-  bra     gb
+  bra     InHex
 
+InHex_Long:
 getl:
   move.w  #7, t1
 
 
-gb:
+InHex:
   ; save registers, and restore our counter
   movem.l d1-d2, -(a7)
   move.w  t1, d2
@@ -711,7 +617,7 @@ n1:
 ;
 CommandTable:
   dc.w    $4d00           ;m - memory update
-  dc.l    mem
+  dc.l    Cmd_MemUpdate
   dc.w    $4c00           ;l - load from host (S-format)
   dc.l    load
   dc.w    $0c00           ;ctrl-l - load from host (S-format)
@@ -719,7 +625,7 @@ CommandTable:
   dc.w    $5500           ;u - upload program from terminal port
   dc.l    uload
   dc.w    $4400           ;d - dump contents of memory
-  dc.l    dump
+  dc.l    Cmd_MemDump
   dc.w    $5300           ;s - single step
   dc.l    singl
   dc.w    $5400           ;t - trace a program's path
@@ -733,7 +639,7 @@ CommandTable:
   dc.w    $4200           ;b - set/remove breakpoints
   dc.l    bkpt
   dc.w    $4300           ;c - copy memory blocks
-  dc.l    copy
+  dc.l    Cmd_MemCopy
   dc.w    $5200           ;r - display/modify registers
   dc.l    regs
   dc.w    $5000           ;p - prototype commands
@@ -865,11 +771,11 @@ regs:   bsr getch                       ;get delimiter
         cmp.b   #$0d,d0                 ;if <cr> then start at sr
         beq     rnoad
         lea     getch,a0                ;else set for terminal input
-        bsr     getb                    ;get register name
+        bsr     InHex_Byte                    ;get register name
         bsr     raddr                   ;set address
         bra     rplp                    ;set register pointer
 rnoad:  lea     rtab1,a3                ;set default pointer value
-        move.w  a3,rexam
+        move.l  a3,rexam
 rplp:   lea     rmes,a0                 ;say hello
         bsr     writs
         bsr     rloc                    ;write starting loc value
@@ -878,7 +784,7 @@ rlp:    lea     rprmp,a0                ;write register prompt
         bsr     getch                   ;get command
         moveq   #$2,d2                  ;set for search
         lea     rtab-4,a0
-rmlp:   addq.w  #$4,a0                  ;search
+rmlp:   addq.l  #$4,a0                  ;search
         cmp.b   (a0),d0
         dbeq    d2,rmlp
         bne     rexit                   ;exit if not found
@@ -887,12 +793,12 @@ rmlp:   addq.w  #$4,a0                  ;search
         bra     rlp                     ;go again
 rexit:  rts
 rdot:   lea     getch,a0                ;set register pointer
-        bsr     getb
+        bsr     InHex_Byte
         bsr     raddr                   ;set input address
         bsr     rloc                    ;write register and value
         rts
 requ:   lea     getch,a0                ;set new value
-        movea.w rexam,a3
+        movea.l rexam,a3
         moveq   #$0,d1                  ;clear d1
         move.b  $1(a3),d1               ;get offset
         beq     requs                   ;branch if sr is reg
@@ -901,27 +807,27 @@ requ:   lea     getch,a0                ;set new value
         adda.l  d1,a4                   ;add offset
         move.l  d0,(a4)                 ;move in new value
         bra     requr                   ;print it
-requs:  bsr     getw                    ;same as above but for sr (word vs. long
+requs:  bsr     InHex_Word                    ;same as above but for sr (word vs. long
         move.w  d0,_sr
 requr:  bsr     rloc                    ;write new value
         rts
 rall:   lea     rtab1-4,a3              ;write all registers
         moveq   #$11,d2                 ;set count
-ralp:   addq.w  #$4,a3                  ;loop
-        move.w  a3,rexam
+ralp:   addq.l  #$4,a3                  ;loop
+        move.l  a3,rexam
         bsr     rloc
         dbf     d2,ralp
         rts
 raddr:  move.w  #$11,d4                 ;find offset in save area
         lea     rtab1-4,a3
-radlp:  addq.w  #$4,a3
+radlp:  addq.l  #$4,a3
         cmp.b   (a3),d0
         dbeq    d4,radlp
         bne     rexit
-        move.w  a3,rexam                ;set register pointer
+        move.l  a3,rexam                ;set register pointer
         rts
 rloc:   bsr     crlf                    ;print register name and value
-        movea.w rexam,a4
+        movea.l rexam,a4
         move.b  $2(a4),d0               ;write name
         bsr     writ
         move.b  $3(a4),d0
@@ -934,10 +840,10 @@ rloc:   bsr     crlf                    ;print register name and value
         lea     _sr,a0                  ;find offset
         adda.l  d0,a0                   ;add offset
         move.l  (a0),d0                 ;move in new value
-        bsr     writl
+        bsr     OutHex_Long
         bra     rrts
 rpsr:   move.w  _sr,d0                  ;write sr value
-        bsr     writw
+        bsr     OutHex_Word
 rrts:   rts
 
 ; load commands

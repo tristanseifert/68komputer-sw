@@ -35,7 +35,7 @@ proto:  bsr     getch                   ;get prototype number
         cmp.b   #$0d,d0                 ;if <cr> then do command
         beq     prun
         lea     getch,a0                ;else install in table
-        bsr     getw                    ;get address
+        bsr     InHex_Word                    ;get address
         move.w  d0,(a1)                 ;move in address
         lea     pmess,a0
         bsr     writs
@@ -111,14 +111,14 @@ bdis:   lea     bdmes,a0                ;handle display all bkpts
 bdlp:   adda.w  #$4,a1                  ;loop
         move.w  iloc(a1),d0             ;get bkpt
         beq     belp                    ;if 0 then not an entry
-        bsr     writw
+        bsr     OutHex_Word
         bsr     crlf
 belp:   dbf     d1,bdlp                 ;loop
         bra     brts
 bpls:   lea     bktab-4,a1              ;add a bkpt
         moveq   #$4,d1                  ;set for loop
         lea     getch,a0                ;setup to get address
-        bsr     getw
+        bsr     InHex_Word
 bl2:    adda.w  #$4,a1                  ;loop
         cmp.w   iloc(a1),d0             ;found entry already in table ?
         bne     bmo                     ;yes
@@ -135,7 +135,7 @@ bmo:    move.w  iloc(a1),d2             ;move to set condition codes
 bfnd:   lea     bpmes,a0                ;load message
         bsr     writs
         move.l  a2,d0
-        bsr     writw
+        bsr     OutHex_Word
         bclr    #$1,bkptf               ;clear in-single flag
         btst    #$2,bkptf               ;In trace ?
         bne     brts                    ;Yes
@@ -144,7 +144,7 @@ bfnd:   lea     bpmes,a0                ;load message
 bmin:   lea     bktab-4,a1              ;delete a breakpoint entry
         moveq   #$4,d1                  ;setup for search
         lea     getch,a0                ;setup for terminal input
-        bsr     getw
+        bsr     InHex_Word
 bl3:    adda.w  #$4,a1                  ;loop
         cmp.w   iloc(a1),d0             ;Is this the one ?
         dbeq    d1,bl3                  ;if yes then exit else loop
@@ -163,98 +163,11 @@ bl3:    adda.w  #$4,a1                  ;loop
 bok:    lea     bmmes,a0                ;load message
         bsr     writs
         move.l  a2,d0                   ;print address
-        bsr     writw
+        bsr     OutHex_Word
         bra     brts
 bbad:   lea     bbmes,a0                ;error handler
         bsr     writs
 brts:   rts
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; dump - dump memory
-;
-;*****************************************
-;*                                       *
-;*    dump is invoked as follows:        *
-;*                                       *
-;*    d<cr> - dump the next 64 bytes from*
-;*            last examined location     *
-;*    d xxxxxxxx<cr> - dump the next 64 bytes*
-;*                 from address xxxxxxxx     *
-;*    d xxxxxxxx,yyyyyyyy - dump the bytes bet-  *
-;*                  ween xxxxxxxx and yyyyyyyy   *
-;*                                       *
-;*****************************************
-;
-dmes:   dc.b    lf,lf,cr
-        dc.b    "Memory dump"
-        dc.b    lf,cr,nul
-dhed:   dc.b    lf,cr
-        dc.b    "      0  1  2  3  4  5  6  7  8  9  a  B  C  d  E  F"
-dcr:    dc.b    lf,cr,nul
-
-dump:   lea     getch,a0                ;set for terminal input
-        bsr     getch                   ;get delimiter
-        cmp.b   #$0d,d0                 ;if <cr> then dump from pointer
-        bne     dexam                   ;else get address
-
-        movea.w exam,a1                 ;get exam
-        movea.w a1,a2                   ;save it for ending address
-        adda.w  #$40,a2                 ;add 64 for length of dump
-        bra     dgo                     ;go do it
-
-dexam:  bsr     getl                    ;get starting address
-        movea.w d0,a1
-        bsr     getch                   ;get delimiter
-        cmp.b   #$2c,d0                 ;if , the get ending address
-        bne     dcom
-        bsr     getl                    ;get address
-        movea.w d0,a2                   ;save it
-        bra     dgo                     ;go dump
-
-dcom:   movea.w a1,a2                   ;default to 64 byte dump
-        adda.w  #$40,a2
-
-dgo:    lea     dmes,a0                 ;do the dump
-        bsr     writs
-        lea     dhed,a0                 ;print header
-        bsr     writs
-        move.l  a1,d0                   ;set starting address at 16 byte boundary
-        and.b   #$f0,d0
-        movea.w d0,a1
-        move.l  a2,d0                   ;round ending address to boundary
-        or.b    #$0f,d0
-        movea.w d0,a2
-        moveq   #$0f,d1                 ;move byte count to register
-dl1:    move.l  a1,d0                   ;write starting address
-        bsr     writw
-        movea.w a1,a3                   ;save starting address
-dflp:   moveq   #$20,d0                 ;write a space
-        bsr     writ
-        move.b  (a1)+,d0                ;get next byte
-        bsr     writb                   ;write it
-        dbf     d1,dflp                 ;loop
-        moveq   #$0f,d1                 ;reset byte count
-        movea.w a3,a1                   ;refetch starting address
-        moveq   #$20,d0                 ;write a space
-        bsr     writ
-dslp:   move.b  (a1)+,d0                ;write the byte representation
-        cmp.b   #$20,d0                 ;if not printable then a dot
-        bge     dok
-        move.b  #$2e,d0                 ;move in the dot
-        bra     dwrt
-dok:    cmp.b   #$7f,d0                 ;printable again ?
-        blt     dwrt                    ;yes
-        move.b  #$2e,d0                 ;no, move in a dot
-dwrt:   bsr     writ                    ;write it
-        dbf     d1,dslp                 ;line done ?
-        lea     dcr,a0                  ;yes, so cr-lf
-        bsr     writs
-        moveq   #$10,d1                 ;reset byte count
-        cmpa.l  a1,a2                   ;done ?
-        dblt    d1,dl1                  ;NO, so loop
-        move.w  a1,exam                 ;yes, so update exam
-        rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -343,30 +256,40 @@ sdone:  rts
 ;*      g<cr> - go from start address in *
 ;*              last load                *
 ;*      <cr> - same as g<cr>             *
-;*      g xxxx - go from address xxxx    *
+;*      g xxxxxxxx - go from address xxxxxxxx    *
 ;*                                       *
 ;*****************************************
 ;
 gmes:   dc.w    csc
         dc.b    "Program:"
         dc.b    lf,lf,cr,nul
-go:     bsr     getch                   ;get seperator
-        cmp.b   #$0d,d0                 ;if CR then
-        beq     ggo                     ;start from default
-gget:   lea     getch,a0                ;else get start addr
-        bsr     getw                    ;as given in comm.
-        move.l  d0,_pc                  ;set for return
-ggo:    btst    #$1,bkptf               ;single set ?
-        bne     gnom                    ;Yes so no message
-        lea     gmes,a0                 ;write message
-        bsr     writs
-gnom:   addq.w  #$4,a7                  ;pop the stack
-        movem.l dr0,#$7fff              ;get saved values d0-a6
-        move.l  a7,t1                   ;save system stack pointer
-        movea.l ar7,a7                  ;get saved user stack pointer
-        move.l  a7,usp                  ;reset the user stack
-        movea.l t1,a7                   ;reset system stack
-gbmov:  move.l  _pc,-(a7)               ;set up return pc
-        andi.w  #$f8ff,_sr              ;enable interrupts
-        move.w  _sr,-(a7)               ;set up return sr
-        rte
+        even
+
+go:
+  bsr     getch                   ;get seperator
+  cmp.b   #$0d,d0                 ;if CR then
+  beq     ggo                     ;start from default
+
+gget:
+  lea     getch,a0                ;else get start addr
+  bsr     InHex_Long                    ;as given in comm.
+  move.l  d0,_pc                  ;set for return
+ggo:
+  btst    #$1,bkptf               ;single set ?
+  bne     gnom                    ;Yes so no message
+  lea     gmes,a0                 ;write message
+  bsr     writs
+
+gnom:
+  addq.w  #$4,a7                  ;pop the stack
+  movem.l dr0,#$7fff              ;get saved values d0-a6
+  move.l  a7,t1                   ;save system stack pointer
+  movea.l ar7,a7                  ;get saved user stack pointer
+  move.l  a7,usp                  ;reset the user stack
+  movea.l t1,a7                   ;reset system stack
+
+gbmov:
+  move.l  _pc,-(a7)               ;set up return pc
+  andi.w  #$f8ff,_sr              ;enable interrupts
+  move.w  _sr,-(a7)               ;set up return sr
+  rte
