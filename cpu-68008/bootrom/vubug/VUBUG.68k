@@ -258,15 +258,21 @@ lf      =       $0a
 nul     =       $00
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-howdy:  dc.w    csc
-        dc.b  "M68000 Monitor VUBUG "
-        dc.b "Version 4.0 11 August, 1988"
-rnn0:   dc.b    cr,lf,lf,nul
+howdy:
+  dc.w    csc
+  dc.b    "M68000 Monitor VUBUG "
+  dc.b    "Version 4.0 11 August, 1988"
+  dc.b    cr,lf
+  dc.b    "Modified for 68komputer by Tristan Seifert (2019)"
+
+rnn0:
+  dc.b    cr,lf,lf,nul
 
 ; bad command entered
 Msg_InvalidCommand:
   dc.b  ": Bad Command"
   dc.b    cr, lf, nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -461,8 +467,8 @@ OutHex_Word:
   bra     OutHex
 
 OutHex_Address:
-  move.w  #$5, t1
-  bra     OutHex
+  ; move.w  #$5, t1
+  ; bra     OutHex
 
 OutHex_Long:
 ; writl:

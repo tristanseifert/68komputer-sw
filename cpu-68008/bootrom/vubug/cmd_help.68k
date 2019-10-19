@@ -13,220 +13,239 @@
 ;*      hx - print help message for x    *
 ;*                                       *
 ;*****************************************
-hlph:   dc.b   " H - display help messages"
-        dc.b    cr,lf,nul
-hlph1:  dc.b   " Invoke help as follows:"
-        dc.b    cr,lf
-        dc.b   "      h<cr> - print list of available help"
-        dc.b    cr,lf
-        dc.b   "      hx - print help message for x"
-        dc.b    cr,lf,nul
+; header style (reverse video, bold)
+; pass first the letter, then the description
+Help_ANSI_Header: macro
+  dc.b    $1b, "[1m", $1b, "[7m", $1b, "[1m"
+  dc.b    \1
+  dc.b    " - "
+  dc.b    \2
+  dc.b    $1b,"[0m"
+  dc.b    cr, lf
+endm
 
-hlpc:   dc.b   " C - Copy memory blocks"
-        dc.b    cr,lf,nul
-hlpc1:  dc.b   " Copy is invoked as follows:"
-        dc.b    cr,lf
-        dc.b   "          c xxxx=yyyy,zzzz"
-        dc.b    cr,lf
-        dc.b   " Copy locations yyyy thru zzzz to"
-        dc.b    cr,lf
-        dc.b   " locations xxxx and upward."
-        dc.b    cr,lf,nul
+; description style (indented by four characters)
+Help_Text_Description: macro
+  dc.b  "    ", \1
+  dc.b    cr, lf
+endm
 
-hlpm:   dc.b   " M - memory update"
-        dc.b    cr,lf,nul
-hlpm1:  dc.b   " Memory sub-commands are as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "          m<cr> - start memory mode"
-        dc.b    cr,lf
-        dc.b   "          m xxxx - start m mode at location xxxx"
-        dc.b    cr,lf
-        dc.b   "          .xxxx - set pointer to location xxxx"
-        dc.b    cr,lf
-        dc.b   "          =xx - update current location to xx"
-        dc.b    cr,lf
-        dc.b   "          ,xx - increment location and update it to xx"
-        dc.b    cr,lf
-        dc.b   "          + - increment location"
-        dc.b    cr,lf
-        dc.b   "          - - decrement location"
-        dc.b    cr,lf
-        dc.b   "          <cr> - print current location and value"
-        dc.b    cr,lf,nul
+; command style (bold title)
+Help_ANSI_Command: macro
+  ; write the title of the command
+  dc.b    $1b, "[1m", $1b, "[1m"
+  dc.b    "      - ", \1
+  dc.b    $1b,"[0m"
+  ; newline, then description (with tab)
+  dc.b    cr, lf
+  dc.b    9, \2
+  dc.b    cr, lf
+endm
 
-hlpr:   dc.b   " R - Modify/examine registers"
-        dc.b    cr,lf,nul
-hlpr1:  dc.b   " Register subcommands are as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "      r<cr> - start register mode"
-        dc.b    cr,lf
-        dc.b   "      r xx - start r mode at register xx. Where xx :"
-        dc.b    cr,lf
-        dc.b   "            SR/_sr - status register"
-        dc.b    cr,lf
-        dc.b   "            PC/_pc - program counter"
-        dc.b    cr,lf
-        dc.b   "            d0 - d7 - data registers"
-        dc.b    cr,lf
-        dc.b   "            a0 - a7 - address regs."
-        dc.b    cr,lf
-        dc.b   "     .xx - set pointer to register"
-        dc.b    cr,lf
-        dc.b   "     =xxxxxxxx - update current register to xxxxxxxx"
-        dc.b    cr,lf
-        dc.b   "     <cr> - print all registers"
-        dc.b    cr,lf,nul
 
-hlpl:   dc.b   " L - Load data from host"
-        dc.b    cr,lf,nul
-hlpu:   dc.b   " U - Load data from terminal port"
-        dc.b    cr,lf,nul
-hlpl1:  dc.b   " Load is invoked as follows:"
-        dc.b    cr,lf
-        dc.b   "       l<cr> - load from host with no offset"
-        dc.b    cr,lf
-        dc.b   "       <ff> - same as l<cr> but used from emulator mode"
-        dc.b    cr,lf
-        dc.b   "       l xxxx - load with offset xxxx"
-        dc.b    cr,lf,cr,lf
-        dc.b   " Upload is invoked as follows:"
-        dc.b    cr,lf
-        dc.b    "      u<cr> - load from terminal with no offset"
-        dc.b    cr,lf
-        dc.b    "      u xxxx - load from terminal with offset xxxx"
-        dc.b    cr,lf,nul
+; help command
+HelpText_MsgHeader_Help:
+  Help_ANSI_Header "H", "Help"
+  dc.b   nul
 
-; hlpe:   dc.b   " E - Enter terminal emulator mode"
-;         dc.b    cr,lf,nul
-; hlpe1:  dc.b   " Invoke emulator mode as follows"
-;         dc.b    cr,lf
-;         dc.b    cr,lf
-;         dc.b   "       e"
-;         dc.b    cr,lf
-;         dc.b   "    NOTE: That in this mode any character except"
-;         dc.b    cr,lf
-;         dc.b   "    a ctrl-x may be sent to the host. Ctrl-x is the"
-;         dc.b    cr,lf
-;         dc.b   "    escape sequence for getting out of terminal emulator"
-;         dc.b    cr,lf
-;         dc.b   "    mode. Ctrl-l does the same thing except a load (l)"
-;         dc.b    cr,lf
-;         dc.b   "    command is put in the command buffer."
-;         dc.b    cr,lf,nul
+HelpText_MsgText_Help:
+  Help_Text_Description "Invoke help as follows"
+  Help_ANSI_Command "h<cr>", "Displays all available commands"
+  Help_ANSI_Command "hx", "Displays help for command 'x'"
+  dc.b  nul
 
-hlpp:   dc.b   " P - Prototype commands in RAM"
-        dc.b    cr,lf,nul
-hlpp1:  dc.b   " Prototype commands are invoked:"
-        dc.b    cr,lf
-        dc.b   "      px xxxx - load address xxxx for prototype command x."
-        dc.b    cr,lf
-        dc.b   "      px<cr> - execute prototype command x."
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "      NOTE: x must be a 1, 2, or 3"
-        dc.b    cr,lf,nul
+; Copy command
+HelpText_MsgHeader_Copy:
+  Help_ANSI_Header "C", "Copy Memory"
+  dc.b    nul
 
-hlpb:   dc.b   " B - Set/Remove breakpoints"
-        dc.b    cr,lf,nul
-hlpb1:  dc.b   " Breakpoint is invoked as follows:"
-        dc.b    cr,lf
-        dc.b   "         b<cr> - display breakpoints"
-        dc.b    cr,lf
-        dc.b   "         b+xxxx - add a breakpoint at xxxx"
-        dc.b    cr,lf
-        dc.b   "         b-xxxx - delete breakpoint at xxxx"
-        dc.b    cr,lf
-        dc.b   "         b# - delete all breakpoints"
-        dc.b    cr,lf,nul
+HelpText_MsgText_Copy:
+  Help_Text_Description "Copy arbitrary pieces of memory. Invoke as follows:"
+  Help_ANSI_Command "c xxxxxxxx=yyyyyyyy,zzzzzzzz", "Copy data from yyyyyyyy thru zzzzzzzz to xxxxxxxx and upward"
+  dc.b  nul
 
-hlpd:   dc.b   " D - dump memory"
-        dc.b    cr,lf,nul
-hlpd1:  dc.b   "    dump is invoked as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "    d<cr> - dump the next 64 bytes from last examined location"
-        dc.b    cr,lf
-        dc.b   "    d xxxxxxxx<cr> - dump the next 64 bytes from address xxxxxxxx"
-        dc.b    cr,lf
-        dc.b   "    d xxxxxxxx,yyyyyyyy - dump the bytes between xxxxxxxx and yyyyyyyy"
-        dc.b    cr,lf,nul
 
-hlpa:   dc.b   " A - Assembly listing"
-        dc.b    cr,lf,nul
-hlpa1:  dc.b   "    disassembly is invoked as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "    a<cr> - list the next 20 instructions from last location"
-        dc.b    cr,lf
-        dc.b   "    a xxxx<cr> - list the next 20 instructions from address xxxx"
-        dc.b    cr,lf
-        dc.b   "    a xxxx,yyyy - list the instructions between xxxx and yyyy"
-        dc.b    cr,lf,nul
+; memory mode command
+HelpText_MsgHeader_Memory:
+  Help_ANSI_Header "M", "Manipulate memory"
+  dc.b    nul
 
-hlpt:   dc.b   " T - Set trace mode"
-        dc.b    cr,lf,nul
-hlpt1:  dc.b   " Invoke trace as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "       t+ - trace a program's path"
-        dc.b    cr,lf
-        dc.b   "       t- - turn off trace"
-        dc.b    cr,lf,nul
+HelpText_MsgText_Memory:
+  Help_Text_Description "Invoke memory mode as follows:"
+  Help_ANSI_Command "m<cr>", "Start memory mode at last address"
+  Help_ANSI_Command "m xxxxxxxx", "Start memory mode at specified address"
 
-hlps:   dc.b   " S - set single step"
-        dc.b    cr,lf,nul
-hlps1:  dc.b   " Invoke single step as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "       s+ - turn on single step"
-        dc.b    cr,lf
-        dc.b   "       s- - turn off single step"
-        dc.b    cr,lf,nul
+  Help_Text_Description "\r\n    Memory mode accepts the following commands:"
+  Help_ANSI_Command ".xxxxxxxx", "Set pointer to specified address"
+  Help_ANSI_Command "=xx", "Updates the byte at the current address"
+  Help_ANSI_Command ",xx", "Increment current address, then set its value"
+  Help_ANSI_Command "+", "Increment address"
+  Help_ANSI_Command "-", "Decrement address"
+  Help_ANSI_Command "<cr>", "Prints current address and value"
+  dc.b    nul
 
-hlpg:   dc.b   " G - Start user program"
-        dc.b    cr,lf,nul
-hlpg1:  dc.b   " Invoke go as follows:"
-        dc.b    cr,lf
-        dc.b    cr,lf
-        dc.b   "      g<cr> - go from start address in last load"
-        dc.b    cr,lf
-        dc.b   "      <cr> - same as g<cr>"
-        dc.b    cr,lf
-        dc.b   "      g xxxx - go from address xxxx "
-        dc.b    cr,lf,nul
-        even
 
+; register command
+HelpText_MsgHeader_Register:
+  Help_ANSI_Header "R", "Manipulate registers"
+  dc.b    nul
+
+HelpText_MsgText_Register:
+  Help_Text_Description "Enter the register manipulation mode as follows:"
+  Help_ANSI_Command "r<cr>", "Enter register mode"
+  Help_ANSI_Command "r xx", "Enter register mode at register xx"
+
+  Help_Text_Description "\r\n    Register mode accepts the following commands:"
+  Help_ANSI_Command ".xx", "Set pointer to register"
+  Help_ANSI_Command "=xxxxxxxx", "Update current register to xxxxxxxx"
+  Help_ANSI_Command "<cr>", "Print all registers"
+
+  Help_Text_Description "\r\n    When a command accepts a register, specify one of SR, PC, d0-d7, a0-a7."
+  dc.b    nul
+
+
+; load/upload commands
+HelpText_MsgHeader_Load:
+  Help_ANSI_Header "L", "Load data from host via UART B"
+  dc.b    nul
+
+HelpText_MsgHeader_Upload:
+  Help_ANSI_Header "U", "Load data from terminal via UART A"
+  dc.b    nul
+
+HelpText_MsgDetail_Load:
+  Help_Text_Description "Load is invoked as follows:"
+  Help_ANSI_Command "l<cr>", "Load from host with no offset"
+  Help_ANSI_Command "l xxxxxxxx", "Load from host with offset xxxxxxxx"
+  dc.b    nul
+
+HelpText_MsgDetail_Upload:
+  Help_Text_Description "Upoad is invoked as follows:"
+  Help_ANSI_Command "u<cr>", "Load from terminal with no offset"
+  Help_ANSI_Command "u xxxxxxxx", "Load from terminal with offset xxxxxxxx"
+  dc.b    nul
+
+
+; prototype command
+HelpText_MsgHeader_Prototype:
+  Help_ANSI_Header "P", "Prototype commands in RAM"
+  dc.b    nul
+
+HelpText_MsgText_Prototype:
+  Help_Text_Description "Invoke prototype as follows:"
+  Help_ANSI_Command "px yyyyyyyy", "Load address yyyyyyyy for prototype command x."
+  Help_ANSI_Command "px<cr>", "Execute prototype command x."
+  Help_Text_Description "\r\n    x must be in [1,3]."
+
+  dc.b  nul
+
+
+; breakpoint command
+HelpText_MsgHeader_Breakpoint:
+  Help_ANSI_Header "B", "Manage breakpoints"
+  dc.b    nul
+
+HelpText_MsgText_Breakpoint:
+  Help_Text_Description "Invoke breakpoint management as follows:"
+  Help_ANSI_Command "b<cr>", "display breakpoints"
+  Help_ANSI_Command "b+xxxx", "add a breakpoint at xxxx"
+  Help_ANSI_Command "b-xxxx", "delete breakpoint at xxxx"
+  Help_ANSI_Command "b#", "delete all breakpoints"
+  dc.b    nul
+
+
+; dump memory command
+HelpText_MsgHeader_Dump:
+  Help_ANSI_Header "D", "Dump memory"
+  dc.b  nul
+
+HelpText_MsgText_Dump:
+  Help_Text_Description   "Invoke dump as follows:"
+  Help_ANSI_Command   "d<cr>", "Dump the next 64 bytes from last examined location"
+  Help_ANSI_Command   "d xxxxxxxx<cr>", "Dump the next 64 bytes from address xxxxxxxx"
+  Help_ANSI_Command   "d xxxxxxxx,yyyyyyyy", "Dump bytes between xxxxxxxx and yyyyyyyy"
+  dc.b    nul
+
+
+; disassemble command
+HelpText_MsgHeader_Disasm:
+  Help_ANSI_Header "A", "Disassemble instructions"
+  dc.b    nul
+
+HelpText_MsgText_Disasm:
+  Help_Text_Description   "Invoke disassembly as follows:"
+  Help_ANSI_Command   "a<cr>", "Disassemble the next 20 instructions from last location"
+  Help_ANSI_Command   "a xxxxxxxx<cr>", "Disassemble the next 20 instructions starting at xxxxxxxx"
+  Help_ANSI_Command   "a xxxxxxxx,yyyyyyyy", "Disassemble instructions between xxxxxxxx and yyyyyyyy"
+  dc.b    nul
+
+
+; trace mode command
+HelpText_MsgHeader_Trace:
+  Help_ANSI_Header "T", "Toggle trace mode"
+  dc.b    nul
+
+HelpText_MsgText_Trace:
+  Help_Text_Description "Invoke trace as follows:"
+  Help_ANSI_Command "t+", "Turn on trace mode"
+  Help_ANSI_Command "t-", "Turn off trace mode"
+  dc.b    nul
+
+
+; single step command
+HelpText_MsgHeader_Step:
+  Help_ANSI_Header "S", "Toggle single step mode"
+  dc.b    nul
+
+HelpText_MsgText_Step:
+  Help_Text_Description "Invoke single step as follows:"
+  Help_ANSI_Command "s+", "Turn on single step"
+  Help_ANSI_Command "s-", "Turn off single step"
+  dc.b    nul
+
+
+; Go: run user command
+HelpText_MsgHeader_Go:
+  Help_ANSI_Header "G", "Start user program"
+  dc.b    nul
+
+HelpText_MsgText_Go:
+  Help_Text_Description "Invoke go as follows:"
+  Help_ANSI_Command "g<cr>", "Go from start address in last load"
+  Help_ANSI_Command "<cr>", "same as g<cr>"
+  Help_ANSI_Command "g xxxxxxxx", "Start from address xxxxxxxx"
+  dc.b    nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This table maps a character to the help header and detail text.
 HelpTable:
   dc.w    $4800           ;h - help
-  dc.w    hlph,hlph1
+  dc.w    HelpText_MsgHeader_Help, HelpText_MsgText_Help
   dc.w    $4d00           ;m - memory
-  dc.w    hlpm,hlpm1
+  dc.w    HelpText_MsgHeader_Memory, HelpText_MsgText_Memory
   dc.w    $4c00           ;l - load
-  dc.w    hlpl,hlpl1
+  dc.w    HelpText_MsgHeader_Load, HelpText_MsgDetail_Load
   dc.w    $5500           ;u - upload
-  dc.w    hlpu,hlpl1
+  dc.w    HelpText_MsgHeader_Upload, HelpText_MsgDetail_Upload
   dc.w    $4400           ;d - dump
-  dc.w    hlpd,hlpd1
+  dc.w    HelpText_MsgHeader_Dump, HelpText_MsgText_Dump
   dc.w    $5300           ;s - single step
-  dc.w    hlps,hlps1
+  dc.w    HelpText_MsgHeader_Step, HelpText_MsgText_Step
   dc.w    $5400           ;t - trace program
-  dc.w    hlpt,hlpt1
+  dc.w    HelpText_MsgHeader_Trace, HelpText_MsgText_Trace
   dc.w    $4700           ;g - start user program
-  dc.w    hlpg,hlpg1
-  ; dc.w    $4500           ;e - emulate mode
-  ; dc.w    hlpe,hlpe1
+  dc.w    HelpText_MsgHeader_Go, HelpText_MsgText_Go
   dc.w    $4200           ;b - breakpoints
-  dc.w    hlpb,hlpb1
+  dc.w    HelpText_MsgHeader_Breakpoint, HelpText_MsgText_Breakpoint
   dc.w    $4300           ;c - copy
-  dc.w    hlpc,hlpc1
+  dc.w    HelpText_MsgHeader_Copy, HelpText_MsgText_Copy
   dc.w    $5200           ;r - register modify
-  dc.w    hlpr,hlpr1
+  dc.w    HelpText_MsgHeader_Register, HelpText_MsgText_Register
   dc.w    $5000           ;p - prototype commands
-  dc.w    hlpp,hlpp1
+  dc.w    HelpText_MsgHeader_Prototype, HelpText_MsgText_Prototype
   dc.w    $4100           ;a - assembly listing
-  dc.w    hlpa,hlpa1
+  dc.w    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
 HelpTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -252,12 +271,12 @@ htopic: lea     HelpTable,a1         ;set up search of ctab
         moveq   #((HelpTable_End-HelpTable)/6)-1,d1         ;load total # topics - 1
 lhlp:   cmp.b   (a1),d0         ;is the topic equal to the table value?
         beq     hprn            ;if so, print the short and long helps
-        addq.w  #$06,a1         ;else go to the next table location
+        addq.l  #6,a1         ;else go to the next table location
         dbf     d1,lhlp         ;if not finished, try again
         bra     hall            ;if not one of these, print all shorts
 hprn:   bsr     crlf
         bsr     crlf
-        addq.w  #$02,a1         ;increment a2 to short help location
+        addq.l  #2,a1         ;increment a2 to short help location
         movea.w (a1)+,a0        ;transfer address to a0
         bsr     writs           ;write the short message
         bsr     crlf            ;feed an extra line

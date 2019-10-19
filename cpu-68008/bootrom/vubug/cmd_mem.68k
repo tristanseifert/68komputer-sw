@@ -291,9 +291,8 @@ Cmd_MemDump:
   adda.l  #$40, a2
 
 .StartDump:
-  ; display the "memory dump" message and header
-  lea     .MsgHello, a0
-  bsr     writs
+  ; display the header
+  bsr     crlf
   lea     .MsgHeader, a0
   bsr     writs
 
@@ -314,6 +313,12 @@ Cmd_MemDump:
   ; write the current address
   move.l  a1, d0
   bsr     OutHex_Address
+
+  ; write the divider between the address/hex area
+  moveq   #$20, d0
+  bsr     writ
+  moveq   #'|', d0
+  bsr     writ
 
   ; save the starting address
   movea.l a1, a3
@@ -377,12 +382,10 @@ Cmd_MemDump:
   rts
 
 
-.MsgHello:
-  dc.b    lf,lf,cr
-  dc.b    "Memory dump"
-  dc.b    lf,cr,nul
-
 .MsgHeader:
   dc.b    lf,cr
-  dc.b    "        0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F"
+  dc.b    $1b, "[1m", $1b, "[7m", $1b, "[1m"
+  dc.b    " Address    0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   ASCII View         "
+  dc.b    $1b,"[0m"
+  dc.b    lf,cr,nul
   even

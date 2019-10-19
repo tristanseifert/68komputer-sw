@@ -9,7 +9,7 @@
 ;*                                        *
 ;* Prototype commands are invoked:        *
 ;*                                        *
-;*      px xxxx - load address xxxx for   *
+;*      px xxxxxxxx - load address xxxxxxxx for   *
 ;*                prototype command x.    *
 ;*      px<cr> - execute prototype com-   *
 ;*               mand x.                  *
@@ -35,7 +35,7 @@ proto:  bsr     getch                   ;get prototype number
         cmp.b   #$0d,d0                 ;if <cr> then do command
         beq     prun
         lea     getch,a0                ;else install in table
-        bsr     InHex_Word                    ;get address
+        bsr     InHex_Long                    ;get address
         move.w  d0,(a1)                 ;move in address
         lea     pmess,a0
         bsr     writs
@@ -64,6 +64,8 @@ prts:   rts
 ;*         b-xxxx - delete breakpoint at xxxx *
 ;*         b# - delete all breakpoints        *
 ;*                                            *
+;
+; TODO: make this work for full 32 bit addresses
 ;**********************************************
 ;
 brmes:  dc.b    lf,cr
