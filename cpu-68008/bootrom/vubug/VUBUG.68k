@@ -260,12 +260,35 @@ nul     =       $00
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 howdy:
   dc.w    csc
-  dc.b    "M68000 Monitor VUBUG "
-  dc.b    "Version 4.0 11 August, 1988"
-  dc.b    cr,lf
-  dc.b    "Modified for 68komputer by Tristan Seifert (2019)"
 
-rnn0:
+  ; set the ASCII character set as graphics set 0
+  dc.b    $1b, "(B"
+  ; set the "dec special graphics" as graphics set 1
+  dc.b    $1b, ")0"
+
+  ; draw top border
+  dc.b    $E, $6C
+  dcb.b   $33, $71
+  dc.b    $6B, $F
+  dc.b    cr,lf
+
+  ; first line
+  dc.b    $E, $78, $F
+  dc.b    " M68000 Monitor VUBUG Version 4.0 11 August, 1988  "
+  dc.b    $E, $78, $F
+  dc.b    cr,lf
+
+  ; second line
+  dc.b    $E, $78, $F
+  dc.b    " Modified for 68komputer by Tristan Seifert (2019) "
+  dc.b    $E, $78, $F
+  dc.b    cr,lf
+
+  ; bottom border
+  dc.b    $E, $6D
+  dcb.b   $33, $71
+  dc.b    $6A, $F
+
   dc.b    cr,lf,lf,nul
 
 ; bad command entered
@@ -625,23 +648,19 @@ CommandTable:
   dc.w    $4d00           ;m - memory update
   dc.l    Cmd_MemUpdate
   dc.w    $4c00           ;l - load from host (S-format)
-  dc.l    load
-  dc.w    $0c00           ;ctrl-l - load from host (S-format)
-  dc.l    lnoof
+  dc.l    Cmd_Load
   dc.w    $5500           ;u - upload program from terminal port
-  dc.l    uload
+  dc.l    Cmd_Upload
   dc.w    $4400           ;d - dump contents of memory
   dc.l    Cmd_MemDump
   dc.w    $5300           ;s - single step
-  dc.l    singl
+  dc.l    Cmd_SingleStep
   dc.w    $5400           ;t - trace a program's path
-  dc.l    trace
+  dc.l    Cmd_Trace
   dc.w    $4700           ;g - start user program
-  dc.l    go
+  dc.l    Cmd_Go
   dc.w    $0d00           ;<cr> - short g command
-  dc.l    ggo
-  ; dc.w    $4500           ;e - enter terminal emulator mode
-  ; dc.l    emul
+  dc.l    Cmd_Go_NoAddr
   dc.w    $4200           ;b - set/remove breakpoints
   dc.l    bkpt
   dc.w    $4300           ;c - copy memory blocks
@@ -651,16 +670,16 @@ CommandTable:
   dc.w    $5000           ;p - prototype commands
   dc.l    proto
   dc.w    $4800           ;h - display help messages
-  dc.l    help
+  dc.l    Cmd_Help
   dc.w    $4100           ;a - assembly listing
-  dc.l    assem
+  dc.l    Cmd_Disassemble
 CommandTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Structure of each entry is command
 ; (com) and address of servicing routine
-; (code) (XXX: this will break horribly if we're mapped above $00FFFF)
+; (code)
 ;
 com     =       $0
 code    =       $2
@@ -705,153 +724,6 @@ clp:
 ; memory related commands
   include "cmd_mem.68k"
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Regs - Modify/examine registers
-;
-;***************************************
-;*                                     *
-;* Register subcommands are as follows:*
-;*                                     *
-;*      r<cr> - start register mode    *
-;*      r xx - start r mode at register*
-;*        xx. Where xx :               *
-;*            SR/_sr - status register *
-;*            PC/_pc - program counter *
-;*            d0 - d7 - data registers *
-;*            a0 - a7 - address regs.  *
-;*     .xx - set pointer to regsister  *
-;*     =xxxxxxxx - update current reg- *
-;*                 ister to xxxxxxxx   *
-;*     <cr> - print all registers      *
-;*                                     *
-;***************************************
-;
-rtab:   dc.w    $2e00           ;.
-        dc.w    rdot
-        dc.w    $3d00           ;=
-        dc.w    requ
-        dc.w    $0d00           ;<cr>
-        dc.w    rall
-rtab1:  dc.w    $cb00           ;internal name/offset
-        dc.b    "SR"                    ;print name
-        dc.w    $9c02
-        dc.b    "PC"
-        dc.w    $d006
-        dc.b    "d0"
-        dc.w    $d10a
-        dc.b    "d1"
-        dc.w    $d20e
-        dc.b    "d2"
-        dc.w    $d312
-        dc.b    "d3"
-        dc.w    $d416
-        dc.b    "d4"
-        dc.w    $d51a
-        dc.b    "d5"
-        dc.w    $d61e
-        dc.b    "d6"
-        dc.w    $d722
-        dc.b    "d7"
-        dc.w    $a026
-        dc.b    "a0"
-        dc.w    $a12a
-        dc.b    "a1"
-        dc.w    $a22e
-        dc.b    "a2"
-        dc.w    $a332
-        dc.b    "a3"
-        dc.w    $a436
-        dc.b    "a4"
-        dc.w    $a53a
-        dc.b    "a5"
-        dc.w    $a63e
-        dc.b    "a6"
-        dc.w    $a742
-        dc.b    "a7"
-rmes:   dc.b    lf,lf,cr
-        dc.b    "Register Mode", nul
-rprmp:  dc.b    lf,cr,':',nul
-reqm:   dc.b    " == ", nul
-regs:   bsr getch                       ;get delimiter
-        cmp.b   #$0d,d0                 ;if <cr> then start at sr
-        beq     rnoad
-        lea     getch,a0                ;else set for terminal input
-        bsr     InHex_Byte                    ;get register name
-        bsr     raddr                   ;set address
-        bra     rplp                    ;set register pointer
-rnoad:  lea     rtab1,a3                ;set default pointer value
-        move.l  a3,rexam
-rplp:   lea     rmes,a0                 ;say hello
-        bsr     writs
-        bsr     rloc                    ;write starting loc value
-rlp:    lea     rprmp,a0                ;write register prompt
-        bsr     writs
-        bsr     getch                   ;get command
-        moveq   #$2,d2                  ;set for search
-        lea     rtab-4,a0
-rmlp:   addq.l  #$4,a0                  ;search
-        cmp.b   (a0),d0
-        dbeq    d2,rmlp
-        bne     rexit                   ;exit if not found
-        movea.w $2(a0),a0               ;found it so go to it
-        jsr     (a0)
-        bra     rlp                     ;go again
-rexit:  rts
-rdot:   lea     getch,a0                ;set register pointer
-        bsr     InHex_Byte
-        bsr     raddr                   ;set input address
-        bsr     rloc                    ;write register and value
-        rts
-requ:   lea     getch,a0                ;set new value
-        movea.l rexam,a3
-        moveq   #$0,d1                  ;clear d1
-        move.b  $1(a3),d1               ;get offset
-        beq     requs                   ;branch if sr is reg
-        bsr     getl                    ;get new value
-        lea     _sr,a4                  ;find save area offset
-        adda.l  d1,a4                   ;add offset
-        move.l  d0,(a4)                 ;move in new value
-        bra     requr                   ;print it
-requs:  bsr     InHex_Word                    ;same as above but for sr (word vs. long
-        move.w  d0,_sr
-requr:  bsr     rloc                    ;write new value
-        rts
-rall:   lea     rtab1-4,a3              ;write all registers
-        moveq   #$11,d2                 ;set count
-ralp:   addq.l  #$4,a3                  ;loop
-        move.l  a3,rexam
-        bsr     rloc
-        dbf     d2,ralp
-        rts
-raddr:  move.w  #$11,d4                 ;find offset in save area
-        lea     rtab1-4,a3
-radlp:  addq.l  #$4,a3
-        cmp.b   (a3),d0
-        dbeq    d4,radlp
-        bne     rexit
-        move.l  a3,rexam                ;set register pointer
-        rts
-rloc:   bsr     crlf                    ;print register name and value
-        movea.l rexam,a4
-        move.b  $2(a4),d0               ;write name
-        bsr     writ
-        move.b  $3(a4),d0
-        bsr     writ
-        lea     reqm,a0
-        bsr     writs
-        moveq   #$0,d0
-        move.b  $1(a4),d0               ;write value
-        beq     rpsr                    ;branch if sr
-        lea     _sr,a0                  ;find offset
-        adda.l  d0,a0                   ;add offset
-        move.l  (a0),d0                 ;move in new value
-        bsr     OutHex_Long
-        bra     rrts
-rpsr:   move.w  _sr,d0                  ;write sr value
-        bsr     OutHex_Word
-rrts:   rts
-
 ; load commands
   include "cmd_load.68k"
 ; various debug commands
@@ -870,3 +742,25 @@ rrts:   rts
 ; stub tick handler
 Loader_Handle_Tick:
   rts
+
+Illegal:
+  illegal
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Test user program
+  org $8000
+
+TestProg:
+  lea     .Message, a0
+  trap    #8
+
+  bra.s   TestProg
+
+.Message:
+  dc.b  "It is "
+  dc.b  $1b, "[1m", $1b, "[7m", $1b, "[1m"
+  dc.b  "kush smoking"
+  dc.b  $1b, "[0m"
+  dc.b  " time!"
+  dc.b  cr, lf, nul
+  even

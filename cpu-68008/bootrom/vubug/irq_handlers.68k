@@ -34,33 +34,40 @@ Trap_WriteMsgWithPc_MsgTrap:
 ;
 ; Breakpoint handler
 ;
-bhmes:  dc.b    lf,cr
-        dc.b    "Breakpoint at ", nul
-binin:  dc.b    lf,cr
-        dc.b    "Bad Instruction at ", nul
-        even
+bhmes:
+  dc.b    lf,cr
+  dc.b    "Breakpoint at ", nul
+
+binin:
+  dc.b    lf,cr
+  dc.b    "Bad Instruction at ", nul
+  even
 
 bhlr:
-  move.w  ssrn,sr                 ;disable interrupts
-  movem.l #$ffff,dr0              ;save registers d0-a7
-  move.l  usp,a6                  ;get and save user stack pointer
-  move.l  a6,ar7
-  move.w  (a7)+,_sr               ;save status register
-  move.l  (a7)+,_pc               ;save program counter
+  move.w  ssrn, sr                 ;disable interrupts
+  movem.l #$ffff, (dr0)              ;save registers d0-a7
+  
+  move.l  usp, a6                  ;get and save user stack pointer
+  move.l  a6, (ar7)
+  move.w  (a7)+, (_sr)               ;save status register
+  move.l  (a7)+, (_pc)               ;save program counter
   pea     comm                    ;set for return to comm
-  move.w  ssri,-(a7)              ;enable interrupts on return
-  movea.l _pc,a0                  ;get pc on interrupt
-  cmpi.w  #$ffff,(a0)             ;was interrupt caused by bkpt instruction ?
-  beq     bsnd                    ;Yes
-  lea     binin,a0                ;No, invalid instruction
+  move.w  ssri, -(a7)              ;enable interrupts on return
+  movea.l (_pc), a0                  ;get pc on interrupt
 
-  bra     Trap_WriteMsgWithPc                   ;go wx message
+  ; was this interrupt caused by a breakpoint?
+  cmpi.w  #$ffff, (a0)
+  beq     .IsBkpt
 
-bsnd:
+  ; no, it was an illegal instruction :(
+  lea     binin, a0
+  bra     Trap_WriteMsgWithPc
+
+.IsBkpt:
   ; write breakpoint message and address of PC
-  lea     bhmes, a0                ;wx bkpt message
+  lea     bhmes, a0
   bsr     writs
-  move.l  _pc, d0
+  move.l  (_pc), d0
   bsr     OutHex_Address
   bsr     crlf
 

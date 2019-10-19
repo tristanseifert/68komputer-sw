@@ -16,80 +16,141 @@
 ;*                                      *
 ;****************************************
 ;
-lmes:   dc.b    lf,cr
-        dc.b    "Load...", nul
-slmes:  dc.b    lf,cr
-        dc.b    "User PC == ", nul
-elmes:  dc.b    lf,cr
-        dc.b    "Load done...", nul
-        dc.b    nul
+Cmd_Load:
+  ; did we receive a <cr>? if so, use an offset of 0
+  bsr     getch
+  cmp.b   #$0d, d0
+  beq     .NoOffset
 
-load:   bsr     getch                   ;get delimiter
-        cmp.b   #$0d,d0                 ;if <cr> then no offset
-        beq     lnoof
-        lea     getch,a0                ;get offset
-        bsr     InHex_Word
-        move.l  d0,_pc                  ;save load point for go command
-        bra     ld1
-lnoof:  move.l  #$0,_pc
-ld1:
-        ; this clears the UART B receive buffer
-        ; lea     lbuff,a1                ;point at lpbuff
-        ; move.w  #$0,head(a1)            ;set queue for lp
-        ; move.w  #$ffff,tail(a1)
-        ; move.w  #$0,count(a1)
-        move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
+  ; read the offset in
+  lea     getch, a0
+  bsr     InHex_Long
+  move.l  d0, (_pc)
+  bra     .StartLoad
 
-        lea     lmes,a0                 ;print starting message
-        bsr     writs
-        move.b  #$0d,d0                 ;load a <cr>
-        bsr     writu                   ;send it to the host
-        lea     lgch,a0                 ;set up for host load routine
-llp:    jsr     (a0)                    ;get S
-        cmp.b   #$53,d0
-        bne     llp                     ;No - start over
-        jsr     (a0)                    ;get 1 or 9
-        cmp.b   #$39,d0                 ;9 - then done
-        beq     ldone
-        cmp.b   #$31,d0                 ;1 - then another record
-        bne     llp
-        bsr     InHex_Byte                    ;get byte count
-        move.l  d0,d1
-        subq.b  #$4,d1                  ;remove count for check
-        bsr     InHex_Word
-        add.l   _pc,d0                  ;add offset
-        movea.w d0,a1                   ;save starting address
-lblp:   bsr     InHex_Byte                    ;get actual data byte
-        move.b  d0,(a1)+                ;move to memory
-        dbf     d1,lblp                 ;loop for count
-        bsr     InHex_Word                    ;gobble up check and crlf
-        bra     llp                     ;try another record
-ldone:  jsr     (a0)                    ;gobble up byte count
-        jsr     (a0)
-        bsr     InHex_Word                    ;get address from end macro
-        add.l   _pc,d0                  ;add offset
-        move.l  d0,d1                   ;save it
-        move.l  d0,_pc                  ;set starting address for go
-        move.w  #$0,_sr                 ;set status register
-        move.l  #$10,d0
-        lea     dr0,a1
-lreg:   move.l  #$0,(a1)+
-        dbf     d0,lreg
-        movea.l a0,a2                   ;save the port location in a2
-        lea     ustck,a0
-        move.l  a0,ar7                  ;set user stack
-        lea     slmes,a0                ;write message
-        bsr     writs
-        move.l  d1,d0
-        bsr     OutHex_Word                   ;write starting address
-        move.l  #$03,d1                 ;gobble up last four bytes
-        movea.l a2,a0                   ;restore the port location to a0
-ll2:    jsr     (a0)
-        dbf     d1,ll2
-        lea     elmes,a0                ;send last message
-        bsr     writs
-        bset    #$00,echo               ;turn terminal echo back on
-        rts
+.NoOffset:
+  ; set default address
+  move.l  #$0, (_pc)
+
+.StartLoad:
+  ; this clears the UART B receive buffer
+  move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
+
+  ; write a starting message and <cr>
+  lea     .MsgLoadStart, a0
+  bsr     writs
+
+  move.b  #$0d, d0
+  bsr     writu
+
+  ; we're going to use the host port load routine
+  lea     lgch, a0
+.GetS:
+  ; read the character and wait to get 'S'
+  jsr     (a0)                    ;get S
+
+  cmp.b   #'S', d0
+  bne     .GetS
+
+  ; get record type: 1 (record) or 9 (done)
+  jsr     (a0)                    ;get 1 or 9
+
+  ; did we get a 9? (done)
+  cmp.b   #'9', d0
+  beq     .LoadDone
+
+  ; was it 1?
+  cmp.b   #'1', d0
+  bne     .GetS
+
+  ; get the byte count
+  bsr     InHex_Byte                    ;get byte count
+  move.l  d0, d1
+
+  ; subtract check byte length
+  subq.b  #4, d1
+
+  ; read the address and add offset
+  bsr     InHex_Word
+  add.l   (_pc), d0
+  movea.l d0, a1
+
+.ReceiveByte:
+  ; read a byte of data, then write it to memory
+  bsr     InHex_Byte
+  move.b  d0, (a1)+
+  dbf     d1, .ReceiveByte
+
+  ; consume check word and newline
+  bsr     InHex_Word
+
+  ; try to fetch another record
+  bra     .GetS
+
+.LoadDone:
+  ; read byte count
+  jsr     (a0)
+  jsr     (a0)
+
+  ; get address from end
+  bsr     InHex_Word
+
+  ; set the entrypoint address
+  add.l   (_pc), d0
+  move.l  d0, d1
+  move.l  d0, (_pc)
+
+  ; set up registers and clear register save area
+  moveq   #0, d1
+
+  move.w  #$0, (_sr)
+  moveq   #$10, d0
+  lea     dr0, a1
+
+.ClearRegLoop:
+  move.l  d1, (a1)+
+  dbf     d0, .ClearRegLoop
+
+  movea.l a0, a2
+
+  ; set up user stack
+  lea     ustck, a0
+  move.l  a0, (ar7)
+
+  ; write the user PC
+  lea     .MsgUserPC, a0
+  bsr     writs
+
+  move.l  d1, d0
+  bsr     OutHex_Long
+
+  ; read four more bytes
+  movea.l a2, a0
+
+  rept 4
+  jsr   (a0)
+  endr
+
+  ; send the "load done" message
+  lea     .MsgLoadDone, a0
+  bsr     writs
+
+  bset    #0, (echo)
+  rts
+
+
+.MsgLoadStart:
+  dc.b    lf,cr
+  dc.b    "Starting load...", nul
+
+.MsgUserPC:
+  dc.b    lf,cr
+  dc.b    "User PC == ", nul
+
+.MsgLoadDone:
+  dc.b    lf,cr
+  dc.b    "Load done!", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -105,7 +166,8 @@ ll2:    jsr     (a0)
 ;*                                      *
 ;****************************************
 ;
-uload:  bsr     getch                   ;same as above, except that it
+Cmd_Upload:
+  bsr     getch                   ;same as above, except that it
         cmp.b   #$0d,d0                 ;uses the terminal port for the
         beq     ulnoof                  ;load.
         lea     getch,a0
@@ -121,10 +183,13 @@ uld1:
         ; move.w  #$0,count(a1)
         move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
 
-        lea     lmes,a0
-        bsr     writs
-        move.b  #$0d,d0
-        bsr     writu
+        ; lea     lmes,a0
+        ; bsr     writs
+        ; move.b  #$0d,d0
+        ; bsr     writu
         lea     getch,a0
         bclr    #$00,echo
-        bra     llp                     ;goes to the load routine above
+
+        ; TODO: make this work again
+        rts
+        ; bra     llp                     ;goes to the load routine above

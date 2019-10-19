@@ -1,6 +1,160 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Various debugging commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Regs - Modify/examine registers
+;
+;***************************************
+;*                                     *
+;* Register subcommands are as follows:*
+;*                                     *
+;*      r<cr> - start register mode    *
+;*      r xx - start r mode at register*
+;*        xx. Where xx :               *
+;*            SR/_sr - status register *
+;*            PC/_pc - program counter *
+;*            d0 - d7 - data registers *
+;*            a0 - a7 - address regs.  *
+;*     .xx - set pointer to regsister  *
+;*     =xxxxxxxx - update current reg- *
+;*                 ister to xxxxxxxx   *
+;*     <cr> - print all registers      *
+;*                                     *
+;***************************************
+;
+rtab:
+  dc.w    $2e00           ;.
+  dc.w    rdot
+  dc.w    $3d00           ;=
+  dc.w    requ
+  dc.w    $0d00           ;<cr>
+  dc.w    rall
+rtab1:
+  dc.w    $cb00           ;internal name/offset
+  dc.b    "SR"                    ;print name
+  dc.w    $9c02
+  dc.b    "PC"
+  dc.w    $d006
+  dc.b    "d0"
+  dc.w    $d10a
+  dc.b    "d1"
+  dc.w    $d20e
+  dc.b    "d2"
+  dc.w    $d312
+  dc.b    "d3"
+  dc.w    $d416
+  dc.b    "d4"
+  dc.w    $d51a
+  dc.b    "d5"
+  dc.w    $d61e
+  dc.b    "d6"
+  dc.w    $d722
+  dc.b    "d7"
+  dc.w    $a026
+  dc.b    "a0"
+  dc.w    $a12a
+  dc.b    "a1"
+  dc.w    $a22e
+  dc.b    "a2"
+  dc.w    $a332
+  dc.b    "a3"
+  dc.w    $a436
+  dc.b    "a4"
+  dc.w    $a53a
+  dc.b    "a5"
+  dc.w    $a63e
+  dc.b    "a6"
+  dc.w    $a742
+  dc.b    "a7"
+rmes:
+  dc.b    lf,lf,cr
+  dc.b    "Register Mode", nul
+rprmp:
+  dc.b    lf,cr,':',nul
+reqm:
+  dc.b    " == ", nul
+  even
+
+
+regs:   bsr getch                       ;get delimiter
+      cmp.b   #$0d,d0                 ;if <cr> then start at sr
+      beq     rnoad
+      lea     getch,a0                ;else set for terminal input
+      bsr     InHex_Byte                    ;get register name
+      bsr     raddr                   ;set address
+      bra     rplp                    ;set register pointer
+rnoad:  lea     rtab1,a3                ;set default pointer value
+      move.l  a3,rexam
+rplp:   lea     rmes,a0                 ;say hello
+      bsr     writs
+      bsr     rloc                    ;write starting loc value
+rlp:    lea     rprmp,a0                ;write register prompt
+      bsr     writs
+      bsr     getch                   ;get command
+      moveq   #$2,d2                  ;set for search
+      lea     rtab-4,a0
+rmlp:   addq.l  #$4,a0                  ;search
+      cmp.b   (a0),d0
+      dbeq    d2,rmlp
+      bne     rexit                   ;exit if not found
+      movea.w $2(a0),a0               ;found it so go to it
+      jsr     (a0)
+      bra     rlp                     ;go again
+rexit:  rts
+rdot:   lea     getch,a0                ;set register pointer
+      bsr     InHex_Byte
+      bsr     raddr                   ;set input address
+      bsr     rloc                    ;write register and value
+      rts
+requ:   lea     getch,a0                ;set new value
+      movea.l rexam,a3
+      moveq   #$0,d1                  ;clear d1
+      move.b  $1(a3),d1               ;get offset
+      beq     requs                   ;branch if sr is reg
+      bsr     getl                    ;get new value
+      lea     _sr,a4                  ;find save area offset
+      adda.l  d1,a4                   ;add offset
+      move.l  d0,(a4)                 ;move in new value
+      bra     requr                   ;print it
+requs:  bsr     InHex_Word                    ;same as above but for sr (word vs. long
+      move.w  d0,_sr
+requr:  bsr     rloc                    ;write new value
+      rts
+rall:   lea     rtab1-4,a3              ;write all registers
+      moveq   #$11,d2                 ;set count
+ralp:   addq.l  #$4,a3                  ;loop
+      move.l  a3,rexam
+      bsr     rloc
+      dbf     d2,ralp
+      rts
+raddr:  move.w  #$11,d4                 ;find offset in save area
+      lea     rtab1-4,a3
+radlp:  addq.l  #$4,a3
+      cmp.b   (a3),d0
+      dbeq    d4,radlp
+      bne     rexit
+      move.l  a3,rexam                ;set register pointer
+      rts
+rloc:   bsr     crlf                    ;print register name and value
+      movea.l rexam,a4
+      move.b  $2(a4),d0               ;write name
+      bsr     writ
+      move.b  $3(a4),d0
+      bsr     writ
+      lea     reqm,a0
+      bsr     writs
+      moveq   #$0,d0
+      move.b  $1(a4),d0               ;write value
+      beq     rpsr                    ;branch if sr
+      lea     _sr,a0                  ;find offset
+      adda.l  d0,a0                   ;add offset
+      move.l  (a0),d0                 ;move in new value
+      bsr     OutHex_Long
+      bra     rrts
+rpsr:   move.w  _sr,d0                  ;write sr value
+      bsr     OutHex_Word
+rrts:   rts
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Proto - Prototype command in ram
@@ -18,12 +172,16 @@
 ;*                                        *
 ;******************************************
 ;
-pmess:  dc.b    lf,cr
-        dc.b    "Prototype ", nul
-pm1:    dc.b    "running:"
-        dc.b    lf,cr,nul
-pm2:    dc.b    "installed"
-        dc.b    cr,nul,nul
+pmess:
+  dc.b    lf,cr
+    dc.b    "Prototype ", nul
+pm1:
+  dc.b    "running:"
+  dc.b    lf,cr,nul
+pm2:
+  dc.b    "installed"
+  dc.b    cr,nul,nul
+
 proto:  bsr     getch                   ;get prototype number
         move.l  d0,d1                   ;save number
         andi.b  #$0f,d1                 ;strip leading hex digit
@@ -68,19 +226,28 @@ prts:   rts
 ; TODO: make this work for full 32 bit addresses
 ;**********************************************
 ;
-brmes:  dc.b    lf,cr
-        dc.b    "Bkpts removed", nul
-bdmes:  dc.b    lf,cr
-        dc.b    "Bkpts at:"
-        dc.b    lf,cr,nul
-bpmes:  dc.b    lf,cr
-        dc.b    "Bkpt added at ", nul
-bmmes:  dc.b    lf,cr
-        dc.b    "Bkpt deleted at ", nul
-bbmes:  dc.b    lf,cr
-        dc.b    "Bkpt error", nul
-        dc.b    nul
-bkin:   dc.w    $FFFF                   ;instruction constant
+brmes:
+  dc.b    lf,cr
+  dc.b    "Bkpts removed", nul
+bdmes:
+  dc.b    lf,cr
+  dc.b    "Bkpts at:"
+  dc.b    lf,cr,nul
+bpmes:
+  dc.b    lf,cr
+  dc.b    "Bkpt added at ", nul
+bmmes:
+  dc.b    lf,cr
+  dc.b    "Bkpt deleted at ", nul
+bbmes:
+  dc.b    lf,cr
+  dc.b    "Bkpt error", nul
+  dc.b    nul
+  even
+
+bkin:
+  dc.w    $FFFF                   ;instruction constant
+
 bkpt:   bsr     getch                   ;get delimiter
         cmp.b   #$0d,d0                 ;if <cr> then print all bkpts
         beq     bdis
@@ -184,28 +351,60 @@ brts:   rts
 ;*                                       *
 ;*****************************************
 ;
-tmes:   dc.b    lf,cr
-        dc.b    "Trace ", nul
-tonm:   dc.b    "on", nul
-toffm:  dc.b    "off", nul
-trace:  bsr     getch                   ;get command
-        move.l  d0,d1                   ;save it
-        lea     tmes,a0                 ;write message
-        bsr     writs
-        cmp.b   #$2b,d1                 ;Is it a + ?
-        beq     ton                     ;yes
-        btst    #$0,bkptf               ;In breakpoint ?
-        bne     tclr                    ;Yes, so don't clear trace
-        andi.w  #$7fff,_sr              ;clear trace
-tclr:   bclr    #$2,bkptf               ;turn-off in-trace flag
-        lea     toffm,a0                ;load off message
-        bra     tdone                   ;exit
-ton:    ori.w   #$8000,_sr              ;set trace bit
-        bclr    #$1,bkptf               ;clear single step
-        bset    #$2,bkptf               ;set in-trace flag
-        lea     tonm,a0                 ;write message
-tdone:  bsr     writs
-        rts
+Cmd_Trace:
+  ; read the next character of the command
+  bsr     getch
+  move.l  d0, d1
+
+  ; write the "Trace" message
+  lea     .MsgTrace, a0
+  bsr     writs
+
+  ; did we read a + (turn trace on?)
+  cmp.b   #'+', d1
+  beq     .TurnOn
+
+  ; are we in a breakpoint?
+  btst    #0, (bkptf)
+  bne     .TurnOff
+
+  ; if not, clear trace
+  andi.w  #$7fff, (_sr)
+
+.TurnOff:
+  ; clear the in-trace flag
+  bclr    #2, (bkptf)
+
+  ; print the "off" string
+  lea     .MsgOff, a0
+  bra     .Done
+
+.TurnOn:
+  ; set trace bit
+  ori.w   #$8000, (_sr)
+
+  ; clear single step flag, but set the in-trace flag
+  bclr    #1, (bkptf)
+  bset    #2, (bkptf)
+
+  ; write the "on" string
+  lea     .MsgOn, a0
+
+
+.Done:
+  bra     writs
+
+
+.MsgTrace:
+  dc.b    lf,cr
+  dc.b    "Trace ", nul
+
+.MsgOn:
+  dc.b    "on", nul
+
+.MsgOff:
+  dc.b    "off", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -220,32 +419,64 @@ tdone:  bsr     writs
 ;*                                       *
 ;*****************************************
 ;
-smes:   dc.b    lf,cr
-        dc.b    "Single step", nul
-sonm:   dc.b    " on ", nul
-soffm:  dc.b    " off ", nul
-        dc.b    nul
-singl:  bsr     getch                   ;get command
-        move.l  d0,d1                   ;save it
-        lea     smes,a0                 ;write message
-        bsr     writs
-        cmp.b   #$2b,d1                 ;+ ?
-        beq     son                     ;yes
-        btst    #$0,bkptf               ;In breakpoint ?
-        bne     sclr                    ;Yes, so don't clear trace
-        andi.w  #$7fff,_sr              ;clear trace bit
-sclr:   bclr    #$1,bkptf               ;turn-off in-single flag
-        lea     soffm,a0                ;write off message
-        bsr     writs
-        bra     sdone                   ;exit
-son:    bclr    #$0,bkptf               ;clear in-bkpt flag
-        bset    #$1,bkptf               ;set in-single flag
-        bclr    #$2,bkptf               ;clear in-trace flag
-        lea     sonm,a0                 ;write message
-        bsr     writs
-        bsr     brem                    ;remove all breakpoints for single
-        ori.w   #$8000,_sr              ;set trace bit
-sdone:  rts
+Cmd_SingleStep:
+  ; read the character (either + or -)
+  bsr     getch
+  move.l  d0, d1
+
+  ; write the "single step" text
+  lea     .MsgSingleStep, a0
+  bsr     writs
+
+  ; is it a + (turn on)
+  cmp.b   #'+', d1
+  beq     .TurnOn
+
+  ; are we in a breakpoint?
+  btst    #0, (bkptf)
+  bne     .TurnOff
+
+  ; we aren't, so turn off the trace bit
+  andi.w  #$7fff, (_sr)
+
+.TurnOff:
+  ; clear breakpoint in-single flag
+  bclr    #1, (bkptf)
+
+  ; write the "off" text
+  lea     .MsgOff, a0
+  bsr     writs
+  bra     .Done
+
+.TurnOn:
+  ; clear in-breakpoint flag, set in-single flag, clear in-trace flag
+  bclr    #0, (bkptf)
+  bset    #1, (bkptf)
+  bclr    #2, (bkptf)
+
+  ; write the "on" text
+  lea     .MsgOn, a0
+  bsr     writs
+
+  ; remove all breakpoints and enable trace
+  bsr     brem
+  ori.w   #$8000, (_sr)
+
+.Done:
+  rts
+
+
+
+.MsgSingleStep:
+  dc.b    lf,cr
+  dc.b    "Single step", nul
+
+.MsgOn:
+  dc.b    " on ", nul
+
+.MsgOff:
+  dc.b    " off ", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -262,36 +493,44 @@ sdone:  rts
 ;*                                       *
 ;*****************************************
 ;
-gmes:   dc.w    csc
-        dc.b    "Program:"
-        dc.b    lf,lf,cr,nul
-        even
+Cmd_Go:
+  ; read in next char: if <cr>, don't read an address
+  bsr     getch
+  cmp.b   #$0d, d0
+  beq     Cmd_Go_NoAddr
 
-go:
-  bsr     getch                   ;get seperator
-  cmp.b   #$0d,d0                 ;if CR then
-  beq     ggo                     ;start from default
+.ReadAddress:
+  ; read in an address
+  lea     getch, a0
+  bsr     InHex_Long
+  move.l  d0, _pc
 
-gget:
-  lea     getch,a0                ;else get start addr
-  bsr     InHex_Long                    ;as given in comm.
-  move.l  d0,_pc                  ;set for return
-ggo:
-  btst    #$1,bkptf               ;single set ?
-  bne     gnom                    ;Yes so no message
-  lea     gmes,a0                 ;write message
+Cmd_Go_NoAddr:
+  ; is the single step flag set?
+  btst    #1, (bkptf)
+  bne     .NoMessage
+
+  ; if not, print the "program" string
+  lea     .ProgramMsg, a0
   bsr     writs
 
-gnom:
-  addq.w  #$4,a7                  ;pop the stack
-  movem.l dr0,#$7fff              ;get saved values d0-a6
-  move.l  a7,t1                   ;save system stack pointer
-  movea.l ar7,a7                  ;get saved user stack pointer
-  move.l  a7,usp                  ;reset the user stack
-  movea.l t1,a7                   ;reset system stack
+.NoMessage:
+  ; set up a stack frame to start the user program
+  addq.w  #$4, a7                  ;pop the stack
+  movem.l (dr0), #$7fff              ;get saved values d0-a6
+  move.l  a7, (t1)                   ;save system stack pointer
+  movea.l (ar7), a7                  ;get saved user stack pointer
+  move.l  a7, usp                  ;reset the user stack
+  movea.l (t1), a7                   ;reset system stack
 
-gbmov:
-  move.l  _pc,-(a7)               ;set up return pc
-  andi.w  #$f8ff,_sr              ;enable interrupts
-  move.w  _sr,-(a7)               ;set up return sr
+  move.l  (_pc), -(a7)               ;set up return pc
+  andi.w  #$f8ff, (_sr)              ;enable interrupts
+  move.w  (_sr), -(a7)               ;set up return sr
   rte
+
+
+.ProgramMsg:
+  dc.w    csc
+  dc.b    "Program:"
+  dc.b    lf,lf,cr,nul
+  even

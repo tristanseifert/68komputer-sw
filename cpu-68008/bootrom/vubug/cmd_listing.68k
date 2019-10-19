@@ -28,7 +28,8 @@ ames:
   dc.b    lf,cr,nul
   even
 
-assem:  lea     getch,a0        ;set for terminal input
+Cmd_Disassemble:
+  lea     getch,a0        ;set for terminal input
         bsr     getch           ;get delimiter
         cmp.b   #$0d,d0         ;if <cr> then list from pointer
         bne     aexam           ;else get address

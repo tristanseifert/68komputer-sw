@@ -3,6 +3,7 @@ bootrom.bin
 bootrom.lst
 
 rom.bin
+rom_vubug.bin
 
 # other build artefacts
 builddate.txt

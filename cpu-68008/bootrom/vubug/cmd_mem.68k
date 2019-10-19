@@ -273,7 +273,7 @@ Cmd_MemDump:
 .GetStartAddr:
   ; read the starting address
   bsr     InHex_Long
-  movea.w d0, a1
+  movea.l d0, a1
 
   ; get the delimiter: if CR, start dump - otherwise, read end
   bsr     getch
@@ -282,7 +282,7 @@ Cmd_MemDump:
 
   ; read the end address
   bsr     InHex_Long
-  movea.w d0, a2
+  movea.l d0, a2
   bra     .StartDump
 
 .DefaultSize:
@@ -336,7 +336,7 @@ Cmd_MemDump:
 
   ; we've finished the hex dump: set up for the ascii dump
   moveq   #$0f, d1
-  movea.w a3, a1
+  movea.l a3, a1
 
   ; write the divider between the hex/ascii area
   moveq   #$20, d0
