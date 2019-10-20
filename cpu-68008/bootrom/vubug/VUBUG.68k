@@ -64,7 +64,6 @@
 ;*         b - set/remove breakpoints      *
 ;*         r - examine/update registers    *
 ;*         p - prototype commands          *
-;*         e - terminal emulator mode      *
 ;*         c - copy memory blocks          *
 ;*         x - print help messages         *
 ;*                                         *
@@ -77,10 +76,6 @@
 ; Queue structure
 ;
         org     $0
-head    =       $0000
-tail    =       $0002
-count   =       $0004
-queue   =       $0006
 ;
 ; Breakpoint structure
 ;
@@ -214,6 +209,10 @@ siz:    dc.w    $0000
 writm:  dc.w    $0000
 echo:   dc.w    $0000                   ;terminal port echo flag
 
+; when set, the 68681 interrupt is ignored
+UART_IRQ_Ignored:
+  dc.w  0
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; queues of received characters. the oldest character will always be at address
 ; 0 of the queue, with newly received characters being placed at successive
@@ -328,7 +327,6 @@ start:
 
         ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
         move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
-
         move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
         ; restore interrupts

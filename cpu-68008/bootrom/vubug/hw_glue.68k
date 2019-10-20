@@ -6,6 +6,10 @@
 ; This is our custom version of the 68681 ISR. This handles the queue driven
 ; receive/transmit.
 VUBUG_MC68681_ISR:
+  ; exit immediately if IRQ is inhibited
+  ; tst.w   (UART_IRQ_Ignored)
+  ; bne.s   .IsrInhibited
+
   ; save regs
   movem.l d0-d1/a0, -(sp)
 
@@ -43,6 +47,8 @@ VUBUG_MC68681_ISR:
   ; done, clean up
 .done:
   movem.l (sp)+, d0-d1/a0
+
+.IsrInhibited:
   ; rts
   rte
 

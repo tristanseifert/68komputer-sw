@@ -2,7 +2,7 @@
 ; Definitions of locations in RAM of variables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Start all our variables in the first 4K of RAM (stack occupies the bottom K)
-RAM_Base_App_Real           = RAM_Base
+RAM_Base_App_Real           = RAM_Loader
 
 ; warm boot flag
 RAM_BootFlag                = RAM_Base_App_Real

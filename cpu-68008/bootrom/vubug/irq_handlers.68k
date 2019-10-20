@@ -16,6 +16,10 @@ ghpr:
   lea     Trap_WriteMsgWithPc_MsgTrap, a0
 
 Trap_WriteMsgWithPc:
+  ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
+  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+
   bsr     writs
 
 ; ghpr1:  bsr     writs
@@ -46,7 +50,7 @@ binin:
 bhlr:
   move.w  ssrn, sr                 ;disable interrupts
   movem.l #$ffff, (dr0)              ;save registers d0-a7
-  
+
   move.l  usp, a6                  ;get and save user stack pointer
   move.l  a6, (ar7)
   move.w  (a7)+, (_sr)               ;save status register
@@ -185,15 +189,25 @@ abpr:   lea     abmes,a0
 ;
 ; Exit
 ;
-texit:  movem.l #$ffff,dr0              ;save register values d0-a7
-        move.l  usp,a6                  ;save user stack pointer
-        move.l  a6,ar7
-        move.w  (a7)+,_sr               ;save status register
-        move.l  (a7)+,_pc               ;save pc
-        lea     stack,a7                ;reset system mode stack
-        pea     comm                    ;fake return to comm
-        move.w  ssri,-(a7)              ;ditto for status
-        rte
+texit:
+  movem.l #$ffff,dr0              ;save register values d0-a7
+  move.l  usp,a6                  ;save user stack pointer
+  move.l  a6,ar7
+  move.w  (a7)+,_sr               ;save status register
+  move.l  (a7)+,_pc               ;save pc
+  lea     stack,a7                ;reset system mode stack
+  pea     comm                    ;fake return to comm
+  move.w  ssri,-(a7)              ;ditto for status
+
+  ; also, reset 68681 state
+  move.w   #0, (UART_IRQ_Ignored)
+  bsr     MC68681_Reset
+
+  ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
+  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+
+  rte
 
 ;
 ; Getb
@@ -229,22 +243,22 @@ twrtw:  bsr     OutHex_Word
 twrtl:  bsr     OutHex_Long
         rte
 ;
-; Getc
+; trap 7 - Getc
 ;
 tgetc:  bsr     getch
         rte
 ;
-; Wrts
+; trap 8 - Wrts
 ;
 twrts:  bsr     writs
         rte
 ;
-; Wrtc
+; trap 9 - Wrtc
 ;
 twrtc:  bsr     writ
         rte
 ;
-; Crlf
+; trap 10 - Crlf
 ;
 tcrlf:  bsr     crlf
         rte
