@@ -315,10 +315,8 @@ Cmd_MemDump:
   bsr     OutHex_Address
 
   ; write the divider between the address/hex area
-  moveq   #$20, d0
-  bsr     writ
-  moveq   #'|', d0
-  bsr     writ
+  lea     .Divider, a0
+  bsr     writs
 
   ; save the starting address
   movea.l a1, a3
@@ -339,10 +337,8 @@ Cmd_MemDump:
   movea.l a3, a1
 
   ; write the divider between the hex/ascii area
-  moveq   #$20, d0
-  bsr     writ
-  moveq   #'|', d0
-  bsr     writ
+  lea     .Divider, a0
+  bsr     writs
   moveq   #$20, d0
   bsr     writ
 
@@ -385,7 +381,11 @@ Cmd_MemDump:
 .MsgHeader:
   dc.b    lf,cr
   dc.b    $1b, "[1m", $1b, "[7m", $1b, "[1m"
-  dc.b    " Address    0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   ASCII View         "
+  dc.b    " Address    0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   0123456789ABCDEF   "
   dc.b    $1b,"[0m"
   dc.b    lf,cr,nul
+
+.Divider:
+  dc.b    " ", $E, $78, $F
+  dc.b    nul
   even

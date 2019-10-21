@@ -115,22 +115,34 @@ iloc    =       $0002
         dc.l    IRQ_Unused
         dc.l    IRQ_Unused
 
-        dc.l    texit                   ;exit
-        dc.l    tgetb                   ;getb
-        dc.l    tgetw                   ;getw
-        dc.l    tgetl                   ;getl
-        dc.l    twrtb                   ;wrtb
-        dc.l    twrtw                   ;wrtw
-        dc.l    twrtl                   ;wrtl
-        dc.l    tgetc                   ;getc
-        dc.l    twrts                   ;wrts
-        dc.l    twrtc                   ;wrtc
-        dc.l    tcrlf                   ;crlf
-utrpb:  dc.l    utrapb                  ;user trap vectors
-utrpc:  dc.l    utrapc
-utrpd:  dc.l    utrapd
-utrpe:  dc.l    utrape
-utrpf:  dc.l    utrapf
+        ; trap vectors
+        dc.l    texit
+        dc.l    Svc_Entry_Trap
+        ; dc.l    tgetw                   ;getw
+        ; dc.l    tgetl                   ;getl
+        ; dc.l    twrtb                   ;wrtb
+        ; dc.l    twrtw                   ;wrtw
+        ; dc.l    twrtl                   ;wrtl
+        ; dc.l    tgetc                   ;getc
+        ; dc.l    twrts                   ;wrts
+        ; dc.l    twrtc                   ;wrtc
+        ; dc.l    tcrlf                   ;crlf
+
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
+        dc.l    Trap_Unused
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -143,30 +155,12 @@ utrpf:  dc.l    utrapf
 ; RAM Base address
         org     RAM_Monitor
 
-
-utrapb: dc.l    $00000000
-utrapc: dc.l    $00000000
-utrapd: dc.l    $00000000
-utrape: dc.l    $00000000
-utrapf: dc.l    $00000000
-
-userv1: dc.l    $00000000
-userv2: dc.l    $00000000
-userv3: dc.l    $00000000
-userv4: dc.l    $00000000
-userv5: dc.l    $00000000
-
-uav3:   dc.l    $00000000
-uav4:   dc.l    $00000000
-uav5:   dc.l    $00000000
-uav6:   dc.l    $00000000
-uav7:   dc.l    $00000000
-
 sarea:  dcb.w   $80,$0000               ;system stack
 stack   =       *
 bktab:  dcb.w   $0a,$0000               ;breakpoint table
 
-_sr:    dc.w    $0000                   ;register save area
+; saved registers
+_sr:    dc.w    $0000
 _pc:    dc.l    $00000000
 
 dr0:    dc.l    $00000000
@@ -190,18 +184,19 @@ ptab:   dcb.w   $3,0000                 ;prototype table
 rexam:  dc.w    $0000                   ;register examination pointer
 exam:   dc.l    $0000                   ;memory examination pointer
 
+; temporary memory
 t1:     dc.w    $0000                   ;temporary work area
 t2:     dc.w    $0000
 t3:     dc.w    $0000
 t4:     dc.w    $0000
 t5:     dc.w    $0000
 
+; ctrl+s/ctrl+q flags
 ctrls:  dc.w    $0000                   ;ctrl-s,ctrl-q flag
 bkptf   =       *-1                     ;breakpoint flag
 
-; lbuff:  dcb.w   $0b,0000                ;load buffer
-; ibuff:  dcb.w   $0b,0000                ;terminal buffer
-users:  dcb.w   $80,0000                ;users stack area
+; user stack
+users:  dcb.w   $80,0000
 ustck   =       *
 
 aend:   dc.l    $0000
@@ -297,17 +292,6 @@ Msg_InvalidCommand:
   even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; These are seven user interrupt vectors
-; which must remain at address $0100.
-; Please ensure that they do
-;
-vect1:  dc.l    userv1
-vect2:  dc.l    userv2
-vect3:  dc.l    userv3
-vect4:  dc.l    userv4
-vect5:  dc.l    userv5
-
 ssri:   dc.w    $2000           ;supervisor SR
 ssrn:   dc.w    $2700           ;same w/o interrupts
 
@@ -550,6 +534,10 @@ OutHex:
 IRQ_Unused:
   rte
 
+; unused trap
+Trap_Unused:
+  rts
+
 ; IRQ handler that forwards to RAM
 IRQ_Lvl2:
   move.l  a0, -(sp)
@@ -732,9 +720,26 @@ clp:
   include "cmd_help.68k"
   include "cmd_listing.68k"
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; library type routines
+; include "lib.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Metadata
+Info_BuildDate:
+  incbin  "../builddate.txt"
+  dc.b    0
+  even
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; hardware routines
   include "../68681.68k"
+  include "../rtc.68k"
+
+; loader API
+  include "../loader_svc.68k"
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; stub tick handler
@@ -743,6 +748,11 @@ Loader_Handle_Tick:
 
 Illegal:
   illegal
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Bootloader API entry point: this gives application programs a simple API to
+; interact with the hardware
+  include "loader_entry.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Test user program

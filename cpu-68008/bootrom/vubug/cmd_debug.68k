@@ -507,12 +507,12 @@ Cmd_Go:
 
 Cmd_Go_NoAddr:
   ; is the single step flag set?
-  btst    #1, (bkptf)
-  bne     .NoMessage
+  ; btst    #1, (bkptf)
+  ; bne     .NoMessage
 
   ; if not, print the "program" string
-  lea     .ProgramMsg, a0
-  bsr     writs
+  ; lea     .ProgramMsg, a0
+  ; bsr     writs
 
 .NoMessage:
   ; set up a stack frame to start the user program
@@ -529,8 +529,8 @@ Cmd_Go_NoAddr:
   rte
 
 
-.ProgramMsg:
-  dc.w    csc
-  dc.b    "Program:"
-  dc.b    lf,lf,cr,nul
-  even
+; .ProgramMsg:
+  ; dc.w    csc
+  ; dc.b    "Program:"
+  ; dc.b    lf,lf,cr,nul
+  ; even

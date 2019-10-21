@@ -60,7 +60,7 @@ VUBUG_MC68681_ISR_ChA_Rx:
   move.b  (MC68681_Base+MC68681_R_RHRA), d0
 
   ; did we receive a Ctrl+C?
-  cmp.b   #$03, d0
+  cmp.b   #$3, d0
   beq     .CtrlC
   ; did we receive Ctrl+S?
   cmp.b   #$13, d0
@@ -74,7 +74,7 @@ VUBUG_MC68681_ISR_ChA_Rx:
   bsr     VUBUG_MC68681_ISR_Push
 
   ; is echo turned on?
-  btst    #0, echo
+  btst    #0, (echo)
   beq.s   .Done
 
   bra     writ
@@ -84,11 +84,11 @@ VUBUG_MC68681_ISR_ChA_Rx:
 
 ; Handle Ctrl+S: we set a flag and terminat
 .CtrlS:
-  move.b  #$1, ctrls
+  move.b  #$1, (ctrls)
   bra     .Done
 ; Handle Ctrl+Q: clear the control flag and exit
 .CtrlQ:
-  move.b  #$00, ctrls
+  move.b  #$00, (ctrls)
   bra     .Done
 
 ; Handle Ctrl+C: (should return to prompt)

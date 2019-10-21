@@ -86,54 +86,76 @@ Entry:
 ; output character to the console from register d0.b
 
 VEC_OUT:
-	; write character to DUART
-	move.b  d0, (MC68681_Base+MC68681_W_THRA)
+  movem.l	d1/a0, -(sp)
 
-; then, wait for tx to complete
-.wait:
-	; read the status register, check TXRDY bit (2), loop while clear
-	move.b  (MC68681_Base+MC68681_R_SRA), d0
-	btst    #2, d0
-	beq     .wait
-	rts
+  move.l  d0, d1
+	moveq		#8, d0
+	jsr			Loader_API_Entry
+
+  ; clean up
+  movem.l	(sp)+, d1/a0
+  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; input a character from the console into register d0
 ; else return Cb=0 if there's no character available
 ;
-; thios will always read from UART A
+; this will always read from UART A
 
 VEC_IN:
-	; save registers
-	movem.l	d1/a0, -(sp)
-	lea     (MC68681_Base), a0
+  movem.l	d1/a0, -(sp)
 
-	; is there a byte?
-	move.b  MC68681_R_SRA(a0), d1
-	btst    #0, d1
-	beq.s		.NoByte
+	moveq		#$A, d0
+	jsr			Loader_API_Entry
 
-	; read the byte
-	move.b	MC68681_R_RHRA(a0), d0
+  ; clean up
+  movem.l	(sp)+, d1/a0
 
-	; restore registers
-	movem.l	(sp)+, d1/a0
+  ; branch if no character
+  tst.l   d0
+  bmi     .NoChar
 
-	; we got a byte, set carry bit
-	or.b	 #1, ccr
-	rts
+.GotChar:
+  ; we got a character
+  or.b	 #1, ccr
+  rts
 
-.NoByte:
-	; restore registers
-	movem.l	(sp)+, d1/a0
+.NoChar:
+  ; clear carry flag
+  and.b	#$FE, ccr
+  rts
 
-	; no data has been received
-	moveq	#0, d0
-	and.b	#$FE, ccr
-	rts
-	; no character available, clear carry
-	; and.b	#$FE, ccr
+
+; 	; save registers
+; 	movem.l	d1/a0, -(sp)
+; 	lea     (MC68681_Base), a0
+;
+; 	; is there a byte?
+; 	move.b  MC68681_R_SRA(a0), d1
+; 	btst    #0, d1
+; 	beq.s		.NoByte
+;
+; 	; read the byte
+; 	move.b	MC68681_R_RHRA(a0), d0
+;
+; 	; restore registers
+; 	movem.l	(sp)+, d1/a0
+;
+; 	; we got a byte, set carry bit
+; 	or.b	 #1, ccr
+; 	rts
+;
+; .NoByte:
+; 	; restore registers
+; 	movem.l	(sp)+, d1/a0
+;
+; 	; no data has been received
+; 	moveq	#0, d0
+; 	and.b	#$FE, ccr
+; 	rts
+; 	; no character available, clear carry
+; 	; and.b	#$FE, ccr
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -238,10 +260,10 @@ LAB_sizok
 	MOVE.w	d0,prg_strt-2(a3)		; clear start word
 	MOVE.w	d0,BHsend(a3)		; clear value to string end word
 
-	MOVE.b	#$50,TWidth(a3)		; default terminal width byte for simulator
-	MOVE.b	#$0E,TabSiz(a3)		; save default tab size = 14
+	MOVE.b	#80, TWidth(a3)		; default terminal width byte for simulator
+	MOVE.b	#8, TabSiz(a3)		; save default tab size = 8
 
-	MOVE.b	#$38,Iclim(a3)		; default limit for TAB = 14 for simulator
+	MOVE.b	#72,Iclim(a3)		; wrap at column 79
 
 	LEA		des_sk(a3),a4		; set descriptor stack start
 
@@ -698,7 +720,11 @@ LAB_1359
 	BEQ.s		LAB_1359			; loop if null byte
 
 	CMP.b		#$07,d0			; compare with [BELL]
-	BEQ.s		LAB_1378			; branch if [BELL]
+	BEQ.s		.Bell			; branch if [BELL]
+
+  ; exit if we get Ctrl+D ($4)
+  cmp.b   #$4, d0
+  beq     .ExitToMonitor
 
 	CMP.b		#$0D,d0			; compare with [CR]
 	BEQ		LAB_1866			; do CR/LF exit if [CR]
@@ -706,7 +732,7 @@ LAB_1359
 	BEQ		LAB_1866			; do CR/LF exit if [LF]
 
 	TST.w		d1				; set flags on buffer index
-	BNE.s		LAB_1374			; branch if not empty
+	BNE.s		.CheckBackspace			; branch if not empty
 
 ; the next two lines ignore any non printing character and [SPACE] if the input buffer
 ; is empty
@@ -717,28 +743,31 @@ LAB_1359
 ;##	CMP.b		#' '+1,d0			; compare with [SP]+1
 ;##	BCS.s		LAB_1359			; if < ignore character
 
-LAB_1374:
+.CheckBackspace:
 	CMP.b		#$08,d0			; compare with [BACKSPACE]
 	BEQ.s		LAB_134B			; go delete last character
 	CMP.b		#$7F,d0			; compare with [DEL]
 	BEQ.s		LAB_134B			; go delete last character
 
-LAB_1378
+.Bell:
 	CMP.w		#(Ibuffe-Ibuffs-1),d1	; compare character count with max-1
-	BCC.s		LAB_138E			; skip store & do [BELL] if buffer full
+	BCC.s		.BufferFull			; skip store & do [BELL] if buffer full
 
 	MOVE.b	d0,(a0,d1.w)		; else store in buffer
 	ADDQ.w	#$01,d1			; increment index
-LAB_137F
+.PrintChar:
 	BSR		LAB_PRNA			; go print the character
 	BRA.s		LAB_1359			; always loop for next character
 
 ; announce buffer full
 
-LAB_138E
+.BufferFull:
 	MOVEQ		#$07,d0			; [BELL] character into d0
-	BRA.s		LAB_137F			; go print the [BELL] but ignore input character
+	BRA.s		.PrintChar			; go print the [BELL] but ignore input character
 
+; when we receive Ctrl+D, warm reset into the monitor by taking the exit trap
+.ExitToMonitor:
+  trap    #0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -9014,7 +9043,9 @@ LAB_RMSG
 	dc.b	$0D,$0A,'Ready',$0D,$0A,$00
 LAB_SMSG
 	dc.b	' Bytes free',$0D,$0A,$0A
-	dc.b	'Enhanced 68k BASIC Version 3.52',$0D,$0A,$00
+	dc.b	'Enhanced 68k BASIC Version 3.52',$0D,$0A
+  dc.b  "Ctrl+D to exit", $d, $a, $00
+  even
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

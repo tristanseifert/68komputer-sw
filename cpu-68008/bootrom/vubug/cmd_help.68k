@@ -34,7 +34,8 @@ endm
 Help_Text_Command: macro
   ; write the title of the command
   dc.b    $1b, "[1m", $1b, "[1m"
-  dc.b    "      - ", \1
+  ; dc.b    "      - ", \1
+  dc.b    "      ",  $E, $60, $F," ", \1
   dc.b    $1b,"[0m"
   ; newline, then description (with tab)
   dc.b    cr, lf

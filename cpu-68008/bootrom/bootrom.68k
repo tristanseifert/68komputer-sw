@@ -342,43 +342,4 @@ Info_BuildDate:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Bootloader API entry point
-;
-; Back up d1, a0 and restore when we leave the function. d0 is overwritten
-; anyways by the status in routines.
-;
-  org     $7F80
-
-Svc_Entry:
-  ; back up a0
-  move.l  a0, -(sp)
-
-  ; multiply d0 first: table is word wide
-  add.w   d0, d0
-
-  ; check that the request is in bounds
-  move.l  d1, -(sp)
-
-  moveq   #(Svc_Table_End-Svc_Table), d1
-  cmp.w   d1, d0
-  bge.s   .Invalid
-
-  move.l  (sp)+, d1
-
-  ; get offset into table and jump
-  lea     Svc_Table, a0
-  ; move.w  Svc_Table(pc, d0.w), d1
-  ; jmp     Svc_Table(pc, d1.w)
-  move.w  (a0, d0.w), d0
-  jsr     (a0, d0.w)
-
-.Cleanup:
-  move.l  (sp)+, a0
-  rts
-
-.Invalid:
-  ; also, clean up d1 off the stack if we get here
-  move.l  (sp)+, d1
-
-  ; set error code
-  moveq   #-1, d0
-  bra.s   .Cleanup
+  include "loader_entry.68k"
