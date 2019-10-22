@@ -18,6 +18,14 @@ RTC_Reset:
   move.l  d0, (a0)+
   endr
 
+  ; read from the RTC at least 64 times to reset its internal state
+  lea     (RTC_Time_Reg), a0
+  moveq   #64, d0
+
+.ReadLoop:
+  move.b  (a0), d1
+  dbf     d0, .ReadLoop
+
   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

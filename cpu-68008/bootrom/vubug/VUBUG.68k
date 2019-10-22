@@ -73,13 +73,8 @@
 ;*                                         *
 ;*******************************************
 ;
-; Queue structure
-;
-        org     $0
-;
 ; Breakpoint structure
 ;
-        org     $0
 instr   =       $0000
 iloc    =       $0002
 ;
@@ -95,16 +90,24 @@ iloc    =       $0002
         dc.l    abhlr                   ;bus error
         dc.l    abhlr                   ;address error
         dc.l    bhlr                    ;illegal instruction vector
-        dc.l    ghlr                    ;zero divide
-        dc.l    ghlr                    ;chk
-        dc.l    ghlr                    ;trapv
+        dc.l    Exception_Generic                    ;zero divide
+        dc.l    Exception_Generic                    ;chk
+        dc.l    Exception_Generic                    ;trapv
         dc.l    phlr                    ;privileged instruction trap
         dc.l    thlr                    ;trace handler
         dc.l    bhlr                    ;emulator trap 1010
         dc.l    bhlr                    ;emulator trap 1111
-        org     $3c
-        dc.l    ghlr                    ;uninitialized iterrupt
-        org     $60
+
+        dc.l    Exception_Reserved
+        dc.l    Exception_Reserved
+        dc.l    Exception_Reserved
+
+        dc.l    Exception_Generic                    ;uninitialized iterrupt
+
+        ; a few reserved vectors
+        dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+        dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+        dc.l    Exception_Reserved, Exception_Reserved
 
         dc.l    IRQ_Unused                    ;spurious iterrupt
         dc.l    IRQ_Unused                    ; irq1: unused
@@ -116,18 +119,8 @@ iloc    =       $0002
         dc.l    IRQ_Unused
 
         ; trap vectors
-        dc.l    texit
+        dc.l    Svc_Exit_Trap
         dc.l    Svc_Entry_Trap
-        ; dc.l    tgetw                   ;getw
-        ; dc.l    tgetl                   ;getl
-        ; dc.l    twrtb                   ;wrtb
-        ; dc.l    twrtw                   ;wrtw
-        ; dc.l    twrtl                   ;wrtl
-        ; dc.l    tgetc                   ;getc
-        ; dc.l    twrts                   ;wrts
-        ; dc.l    twrtc                   ;wrtc
-        ; dc.l    tcrlf                   ;crlf
-
         dc.l    Trap_Unused
         dc.l    Trap_Unused
         dc.l    Trap_Unused
@@ -137,104 +130,11 @@ iloc    =       $0002
         dc.l    Trap_Unused
         dc.l    Trap_Unused
         dc.l    Trap_Unused
-
         dc.l    Trap_Unused
         dc.l    Trap_Unused
         dc.l    Trap_Unused
         dc.l    Trap_Unused
         dc.l    Trap_Unused
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-;************************************
-;*                                  *
-;*       Monitor data area          *
-;*                                  *
-;************************************
-;
-; RAM Base address
-        org     RAM_Monitor
-
-sarea:  dcb.w   $80,$0000               ;system stack
-stack   =       *
-bktab:  dcb.w   $0a,$0000               ;breakpoint table
-
-; saved registers
-_sr:    dc.w    $0000
-_pc:    dc.l    $00000000
-
-dr0:    dc.l    $00000000
-dr1:    dc.l    $00000000
-dr2:    dc.l    $00000000
-dr3:    dc.l    $00000000
-dr4:    dc.l    $00000000
-dr5:    dc.l    $00000000
-dr6:    dc.l    $00000000
-dr7:    dc.l    $00000000
-ar0:    dc.l    $00000000
-ar1:    dc.l    $00000000
-ar2:    dc.l    $00000000
-ar3:    dc.l    $00000000
-ar4:    dc.l    $00000000
-ar5:    dc.l    $00000000
-ar6:    dc.l    $00000000
-ar7:    dc.l    $00000000
-
-ptab:   dcb.w   $3,0000                 ;prototype table
-rexam:  dc.w    $0000                   ;register examination pointer
-exam:   dc.l    $0000                   ;memory examination pointer
-
-; temporary memory
-t1:     dc.w    $0000                   ;temporary work area
-t2:     dc.w    $0000
-t3:     dc.w    $0000
-t4:     dc.w    $0000
-t5:     dc.w    $0000
-
-; ctrl+s/ctrl+q flags
-ctrls:  dc.w    $0000                   ;ctrl-s,ctrl-q flag
-bkptf   =       *-1                     ;breakpoint flag
-
-; user stack
-users:  dcb.w   $80,0000
-ustck   =       *
-
-aend:   dc.l    $0000
-siz:    dc.w    $0000
-writm:  dc.w    $0000
-echo:   dc.w    $0000                   ;terminal port echo flag
-
-; when set, the 68681 interrupt is ignored
-UART_IRQ_Ignored:
-  dc.w  0
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; queues of received characters. the oldest character will always be at address
-; 0 of the queue, with newly received characters being placed at successive
-; locations. A counter is provided to indicate the locaton at which data is
-; currently being written.
-;
-; Detecting whether data is available in the queue can be done by checking the
-; write pointer: if it is at the head of the queue (0) there is no data.
-;
-; Queues are represented as follows:
-; - $00: Write pointer
-; - $01: Unused, should be 0
-; - $02: Data area, 16 bytes
-UART_Queue_WritePtr             = $0
-UART_Queue_Data                 = $2
-
-UART_Queue_DataLen              = $10
-
-UART_A_Queue:
-  dc.b  0, 0
-  dc.l  0, 0, 0, 0
-  even
-
-UART_B_Queue:
-  dc.b  0, 0
-  dc.l 0, 0, 0, 0
-  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;+++++++++++++++++++++++++++++++++++++++++
@@ -242,7 +142,7 @@ UART_B_Queue:
 ;            Start of monitor            +
 ;                                        +
 ;+++++++++++++++++++++++++++++++++++++++++
-        org     $C0
+        ; org     $C0
 
 ; this is the escape sequence Esc E
 csc     =       $1b45           ;clear screen (h-19)
@@ -305,16 +205,18 @@ Msg_Prompt:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; monitor entry
 start:
-        ; set up the UARTs
-        move    #$2700, sr
-        bsr     MC68681_Reset
+  ; set up hardware
+  move    #$2700, sr
 
-        ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
-        move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
-        move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+  bsr     MC68681_Reset
+  bsr     RTC_Reset
 
-        ; restore interrupts
-        move    #$2000, sr
+  ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
+  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+
+  ; restore interrupts
+  move    #$2000, sr
 ; memory test
 ;         move.w  #$ffff,d0               ;load $ffff for first memory test
 ;         movea.w #$4000,a0               ;start at $4000
@@ -536,7 +438,11 @@ IRQ_Unused:
 
 ; unused trap
 Trap_Unused:
-  rts
+  rte
+
+; unused exception handler
+Exception_Reserved:
+  rte
 
 ; IRQ handler that forwards to RAM
 IRQ_Lvl2:
@@ -552,18 +458,18 @@ IRQ_Lvl2:
 ; Rstrt - restart from control c
 ;
 VUBUG_Restart:
-    ; restore all the registers we backed up earlier
-    movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
+  ; restore all the registers we backed up earlier
+  movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
 
-    ; build a "fake" exception return frame
-    movem.l #$ffff,dr0              ;save registers d0-a7
-    move.l  usp,a0                  ;save user stack pointer
-    move.l  a0,ar7
-    move.w  (a7)+,_sr               ;save status register from stack
-    move.l  (a7)+,_pc               ;save program counter from stack
-    pea     comm                    ;fake a return to command loop
-    move.w  ssri,-(a7)              ;fake a new status register
-    rte
+  ; build a "fake" exception return frame
+  movem.l #$ffff,dr0              ;save registers d0-a7
+  move.l  usp,a0                  ;save user stack pointer
+  move.l  a0,ar7
+  move.w  (a7)+,_sr               ;save status register from stack
+  move.l  (a7)+,_pc               ;save program counter from stack
+  pea     comm                    ;fake a return to command loop
+  move.w  ssri,-(a7)              ;fake a new status register
+  rte
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -659,6 +565,8 @@ CommandTable:
   dc.l    Cmd_Help
   dc.w    $4100           ;a - assembly listing
   dc.l    Cmd_Disassemble
+  dc.w    $4900           ;I - start basic interpreter
+  dc.l    Cmd_StartBasic
 CommandTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -707,19 +615,24 @@ clp:
   bra     comm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Starts the BASIC interpreter (expect this to be at $8000)
+Cmd_StartBasic:
+  move.l  #$8000, (_pc)
+  bra     Cmd_Go_RunProgram
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include interrupt handlers
+  include "irq_handlers.68k"
+
 ; memory related commands
   include "cmd_mem.68k"
-
 ; load commands
   include "cmd_load.68k"
 ; various debug commands
   include "cmd_debug.68k"
-; include interrupt handlers
-  include "irq_handlers.68k"
-; help and assembly listing
-  include "cmd_help.68k"
   include "cmd_listing.68k"
-
+; help system
+  include "cmd_help.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; library type routines
@@ -727,6 +640,9 @@ clp:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Metadata
+Msg_BuildDate:
+  dc.b    "Build date: "
+
 Info_BuildDate:
   incbin  "../builddate.txt"
   dc.b    0
@@ -746,29 +662,96 @@ Info_BuildDate:
 Loader_Handle_Tick:
   rts
 
-Illegal:
-  illegal
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Bootloader API entry point: this gives application programs a simple API to
 ; interact with the hardware
   include "loader_entry.68k"
 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Test user program
-  org $8000
+; Monitor data area: this will be located in RAM and we just don't load it
+;
+; RAM Base address
+  org     RAM_Monitor
 
-TestProg:
-  lea     .Message, a0
-  trap    #8
+sarea:  dcb.w   $80,$0000               ;system stack
+stack   =       *
+bktab:  dcb.w   $0a,$0000               ;breakpoint table
 
-  bra.s   TestProg
+; saved registers
+_sr:    dc.w    $0000
+_pc:    dc.l    $00000000
 
-.Message:
-  dc.b  "It is "
-  dc.b  $1b, "[1m", $1b, "[7m", $1b, "[1m"
-  dc.b  "kush smoking"
-  dc.b  $1b, "[0m"
-  dc.b  " time!"
-  dc.b  cr, lf, nul
+dr0:    dc.l    $00000000
+dr1:    dc.l    $00000000
+dr2:    dc.l    $00000000
+dr3:    dc.l    $00000000
+dr4:    dc.l    $00000000
+dr5:    dc.l    $00000000
+dr6:    dc.l    $00000000
+dr7:    dc.l    $00000000
+ar0:    dc.l    $00000000
+ar1:    dc.l    $00000000
+ar2:    dc.l    $00000000
+ar3:    dc.l    $00000000
+ar4:    dc.l    $00000000
+ar5:    dc.l    $00000000
+ar6:    dc.l    $00000000
+ar7:    dc.l    $00000000
+
+ptab:   dcb.w   $3,0000                 ;prototype table
+rexam:  dc.w    $0000                   ;register examination pointer
+exam:   dc.l    $0000                   ;memory examination pointer
+
+; temporary memory
+t1:     dc.w    $0000                   ;temporary work area
+t2:     dc.w    $0000
+t3:     dc.w    $0000
+t4:     dc.w    $0000
+t5:     dc.w    $0000
+
+; ctrl+s/ctrl+q flags
+ctrls:  dc.w    $0000                   ;ctrl-s,ctrl-q flag
+bkptf   =       *-1                     ;breakpoint flag
+
+; user stack
+users:  dcb.w   $80,0000
+ustck   =       *
+
+aend:   dc.l    $0000
+siz:    dc.w    $0000
+writm:  dc.w    $0000
+echo:   dc.w    $0000                   ;terminal port echo flag
+
+; when set, the 68681 interrupt is ignored
+UART_IRQ_Ignored:
+  dc.w  0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; queues of received characters. the oldest character will always be at address
+; 0 of the queue, with newly received characters being placed at successive
+; locations. A counter is provided to indicate the locaton at which data is
+; currently being written.
+;
+; Detecting whether data is available in the queue can be done by checking the
+; write pointer: if it is at the head of the queue (0) there is no data.
+;
+; Queues are represented as follows:
+; - $00: Write pointer
+; - $01: Unused, should be 0
+; - $02: Data area, 16 bytes
+UART_Queue_WritePtr             = $0
+UART_Queue_Data                 = $2
+
+UART_Queue_DataLen              = $10
+
+UART_A_Queue:
+  dc.b  0, 0
+  dc.l  0, 0, 0, 0
+  even
+
+UART_B_Queue:
+  dc.b  0, 0
+  dc.l 0, 0, 0, 0
   even

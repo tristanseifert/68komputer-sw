@@ -515,6 +515,7 @@ Cmd_Go_NoAddr:
   ; bsr     writs
 
 .NoMessage:
+Cmd_Go_RunProgram:
   ; set up a stack frame to start the user program
   addq.w  #$4, a7                  ;pop the stack
   movem.l (dr0), #$7fff              ;get saved values d0-a6

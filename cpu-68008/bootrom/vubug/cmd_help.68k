@@ -147,6 +147,8 @@ HelpTable:
   dc.w    HelpText_MsgHeader_Prototype, HelpText_MsgText_Prototype
   dc.w    $4100           ;a - assembly listing
   dc.w    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
+  dc.w    $4900           ;b - basic interpreter
+  dc.w    HelpText_MsgHeader_Basic, HelpText_MsgText_Basic
 HelpTable_End:
 
 
@@ -322,5 +324,19 @@ HelpText_MsgText_Go:
   Help_Text_Command "g<cr>", "Go from start address in last load"
   Help_Text_Command "<cr>", "same as g<cr>"
   Help_Text_Command "g xxxxxxxx", "Start from address xxxxxxxx"
+  Help_Text_Description "\r\n    Send BREAK on UART A to return to the monitor."
+  dc.b    nul
+  even
+
+
+; BASIC: Start the BASIC interpreter
+HelpText_MsgHeader_Basic:
+  Help_Text_Header "I", "Invoke the BASIC interpreter"
+  dc.b    nul
+
+HelpText_MsgText_Basic:
+  Help_Text_Description "Invoke BASIC as follows:"
+  Help_Text_Command "i", "Jumps to the interpreter"
+  Help_Text_Description "\r\n    Return to the monitor by sending Ctrl+D on UART A."
   dc.b    nul
   even

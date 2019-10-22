@@ -260,7 +260,10 @@ LAB_sizok
 	MOVE.w	d0,prg_strt-2(a3)		; clear start word
 	MOVE.w	d0,BHsend(a3)		; clear value to string end word
 
-	MOVE.b	#80, TWidth(a3)		; default terminal width byte for simulator
+  ; MOVE.b	#80, TWidth(a3)		; default terminal width byte for simulator
+
+  ; disable wrapping
+	MOVE.b	#0, TWidth(a3)
 	MOVE.b	#8, TabSiz(a3)		; save default tab size = 8
 
 	MOVE.b	#72,Iclim(a3)		; wrap at column 79

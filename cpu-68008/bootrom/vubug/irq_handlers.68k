@@ -4,6 +4,7 @@
 ;
 ; Generic trap handler
 ;
+Exception_Generic:
 ghlr:   movem.l #$ffff,dr0              ;save all registers d0-a7
         move.l  usp,a6                  ;get user stack pointer
         move.l  a6,ar7                  ;and save it
@@ -189,7 +190,7 @@ abpr:   lea     abmes,a0
 ;
 ; Exit
 ;
-texit:
+Svc_Exit_Trap:
   movem.l #$ffff,dr0              ;save register values d0-a7
   move.l  usp,a6                  ;save user stack pointer
   move.l  a6,ar7
@@ -208,57 +209,3 @@ texit:
   move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
   rte
-
-;
-; Getb
-;
-tgetb:  lea     getch,a0
-        bsr     InHex_Byte
-        rte
-;
-; Getw
-;
-tgetw:  lea     getch,a0
-        bsr     InHex_Word
-        rte
-;
-; Getl
-;
-tgetl:  lea     getch,a0
-        bsr     InHex_Long
-        rte
-;
-; Wrtb
-;
-twrtb:  bsr     OutHex_Byte
-        rte
-;
-; Wrtw
-;
-twrtw:  bsr     OutHex_Word
-        rte
-;
-; Wrtl
-;
-twrtl:  bsr     OutHex_Long
-        rte
-;
-; trap 7 - Getc
-;
-tgetc:  bsr     getch
-        rte
-;
-; trap 8 - Wrts
-;
-twrts:  bsr     writs
-        rte
-;
-; trap 9 - Wrtc
-;
-twrtc:  bsr     writ
-        rte
-;
-; trap 10 - Crlf
-;
-tcrlf:  bsr     crlf
-        rte
