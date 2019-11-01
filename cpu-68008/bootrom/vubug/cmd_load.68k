@@ -8,8 +8,11 @@
 ; following components:
 ;
 ; - 4-byte load base address (in HEX form)
+; - 4-byte checksum over data
 ; - 4-byte length value
 ; - Data bytes
+;
+; Between each of those chunks, we acknowledge by sending a single dot.
 ;
 ;****************************************
 ;*                                      *
@@ -41,6 +44,9 @@ Cmd_Load:
   ; this clears the UART B receive buffer
   move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
 
+  ; disable echo
+  bsr     Echo_Off
+
   ; write a starting message and <cr>
   lea     .MsgLoadStart, a0
   bsr     writs
@@ -50,7 +56,6 @@ Cmd_Load:
 
   ; we're going to use the host port load routine
   lea     lgch, a0
-  bclr    #0, (echo)
 
 .ReadAddress:
   ; try to read the load address
@@ -61,6 +66,21 @@ Cmd_Load:
   lea     .MsgLoadAddr, a0
   bsr     writs
   move.l  (Load_BaseAddr), d0
+  bsr     OutHex_Long
+
+  ; acknowledge
+  moveq   #'.', d0
+  bsr     writu
+
+.ReadChecksum:
+  ; try to read the load checksum
+  lea     lgch, a0
+  bsr     InHex_Long
+  move.l  d0, (Load_ReceivedChecksum)
+
+  lea     .MsgLoadCheck, a0
+  bsr     writs
+  move.l  (Load_ReceivedChecksum), d0
   bsr     OutHex_Long
 
   ; acknowledge
@@ -78,11 +98,21 @@ Cmd_Load:
   move.l  (Load_TotalLength), d0
   bsr     OutHex_Long
 
+  ; Print the "Remaining bytes" message
+  lea     .MsgLoadRemaining, a0
+  bsr     writs
+  move.l  (Load_TotalLength), d0
+  bsr     OutHex_Long
+
   ; acknowledge
   moveq   #'.', d0
   bsr     writu
 
 .PrepareForRead:
+  ; prepare a "checksum" reg and a temp reg
+  moveq   #0, d6
+  moveq   #0, d5
+
   ; read in a byte at a time
   move.l  (Load_TotalLength), d7
   subq.l  #1, d7
@@ -90,11 +120,23 @@ Cmd_Load:
   move.l  (Load_BaseAddr), a1
 
   lea     lgch, a0
+  move.l  a0, a2
 
 .ReceiveLoop:
   ; receive the byte…
   bsr     InHex_Byte
   move.b  d0, (a1)+
+
+  move.b  d0, d5
+  add.l   d5, d6
+
+  ; update remaining bytes counter
+  lea     .MsgBackspace8, a0
+  bsr     writs
+  move.l  d7, d0
+  bsr     OutHex_Long
+
+  move.l  a2, a0
 
   ; …then acknowledge it
   moveq   #'.', d0
@@ -103,6 +145,24 @@ Cmd_Load:
   dbf     d7, .ReceiveLoop
 
 .LoadDone:
+  ; save our computed checksum and print it out
+  move.l  d6, (Load_LocalChecksum)
+
+  lea     .MsgLocalChecksum, a0
+  bsr     writs
+  move.l  d6, d0
+  bsr     OutHex_Long
+
+  ; compare the checksums
+  cmp.l   (Load_ReceivedChecksum), d6
+  beq     .ChecksumValid
+
+.ChecksumError:
+  lea     .MsgChecksumFailed, a0
+  bsr     writs
+  bra     .Exit
+
+.ChecksumValid:
   ; set the entrypoint address
   move.l  (Load_BaseAddr), (_pc)
 
@@ -136,26 +196,47 @@ Cmd_Load:
   lea     .MsgLoadDone, a0
   bsr     writs
 
+.Exit:
   ; clear receive buffers
   move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
   move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
 
   ; re-enable echo flag
-  bset    #0, (echo)
+  bsr     Echo_On
   rts
 
 
 .MsgLoadStart:
   dc.b    lf,cr
-  dc.b    "Starting load...", nul
+  dc.b    "Waiting for load...", nul
 
 .MsgLoadAddr:
   dc.b    lf,cr
-  dc.b    "Load address: $", nul
+  dc.b    "Load address:  $", nul
+
+.MsgLoadCheck:
+  dc.b    lf, cr
+  dc.b    "Load Checksum: $", nul
 
 .MsgLoadLen:
   dc.b    lf, cr
-  dc.b    "Load size:    $", nul
+  dc.b    "Load size:     $", nul
+
+.MsgLoadRemaining:
+  dc.b    lf, cr
+  dc.b    "Remaining      $", nul
+
+.MsgBackspace8:
+  dc.b    $1b, "[8D", nul
+
+.MsgLocalChecksum:
+  dc.b    lf, cr
+  dc.b    "Our Checksum:  $", nul
+
+.MsgChecksumFailed:
+  dc.b    lf, lf, cr
+  dc.b    $7
+  dc.b    "Checksum verification failed!", nul
 
 .MsgUserPC:
   dc.b    lf,cr

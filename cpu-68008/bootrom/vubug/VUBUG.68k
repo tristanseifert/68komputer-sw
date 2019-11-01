@@ -183,11 +183,12 @@ howdy:
   dcb.b   $33, $71
   dc.b    $6A, $F
 
-  dc.b    cr,lf,lf,nul
+  dc.b    cr,lf, "Enter 'I' for BASIC, 'H' for help", cr, lf, nul
 
 ; bad command entered
 Msg_InvalidCommand:
-  dc.b  ": Bad Command"
+  dc.b  $E, $60, $F, " Bad Command"
+  dc.b    $7 ; bell
   dc.b    cr, lf, nul
   even
 
@@ -209,14 +210,14 @@ start:
   move    #$2700, sr
 
   bsr     MC68681_Reset
+  bsr     MC68681_DisableRx
+
   bsr     RTC_Reset
 
   ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
   move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
   move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
-  ; restore interrupts
-  move    #$2000, sr
 ; memory test
 ;         move.w  #$ffff,d0               ;load $ffff for first memory test
 ;         movea.w #$4000,a0               ;start at $4000
@@ -247,8 +248,8 @@ start:
 gwan:
   ; clear both of our receive buffers
   moveq   #0, d0
-  move.b  d0, (UART_Queue_WritePtr+UART_A_Queue)
-  move.b  d0, (UART_Queue_WritePtr+UART_B_Queue)
+  move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
+  move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
 
   lea     UART_Queue_Data+UART_A_Queue, a0
   lea     UART_Queue_Data+UART_B_Queue, a1
@@ -295,10 +296,16 @@ done:
   lea     howdy, a0
   bsr     writs
 
-  ; enable receiving characters here (TODO)
+  ; build date
+  lea     Msg_BuildDate, a0
+  bsr     writs
+  bsr     crlf
+
+  ; enable the receivers here
+  bsr     MC68681_EnableRx
 
   ; turn on terminal echo and enter command loop
-  bset    #0, echo
+  bsr     Echo_On
   bra     comm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -346,6 +353,7 @@ writu:
 ; Generalized routine to write a string which
 ; must terminate in a null (goes to UART A/tty)
 ;
+Out_Puts:
 writs:
   ; get character of string, exit if null
   move.b  (a0)+, d0                ;a0 is address of string
@@ -429,9 +437,6 @@ OutHex:
 ; include any of our hardware glue
         include "hw_glue.68k"
 
-        dc.b    "Kushblunt, tasty!"
-        even
-
 ; unused IRQ
 IRQ_Unused:
   rte
@@ -459,7 +464,25 @@ IRQ_Lvl2:
 ;
 VUBUG_Restart:
   ; restore all the registers we backed up earlier
-  movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
+  ; movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
+
+  ; move    #$2700, sr
+
+  ; disable receivers
+  bsr     MC68681_DisableRx
+
+  ; wait for the break condition to be over on UART A
+.WaitBreak:
+  btst    #7, (MC68681_Base+MC68681_R_SRA)
+  bne     .WaitBreak
+
+  ; reset the 68681 receivers and clear rx buffers
+  moveq   #0, d0
+  move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
+  move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
+
+  bsr     MC68681_EnableRx
+
 
   ; build a "fake" exception return frame
   movem.l #$ffff,dr0              ;save registers d0-a7
@@ -530,6 +553,35 @@ n1:
   movem.l (sp)+, d1-d2
   rts
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Turns off echo: this will disable the cursor as well.
+Echo_Off:
+  ; clear echo flag
+  bclr    #0, (echo)
+
+  ; send "cursor off" sequence
+  lea     .MsgCursorOff, a0
+  bra     writs
+  rts
+
+.MsgCursorOff:
+  dc.b  $1b, "[?25l", nul
+  even
+
+
+; Turns on echo: this enables the cursor as well.
+Echo_On:
+  ; enable echo flag
+  bset    #0, (echo)
+
+  ; send the "cursor on" sequence
+  lea     .MsgCursorOn, a0
+  bra     writs
+  rts
+
+.MsgCursorOn:
+  dc.b  $1b, "[?25h", nul
+  even
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -633,8 +685,11 @@ Cmd_StartBasic:
   include "cmd_help.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; library type routines
-; include "lib.68k"
+; library routines
+  include "lib.68k"
+
+; LZ4 decompression (supports compressed apps in ROM)
+  include "lz4-68k/lz4_fastest.asm"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Metadata
@@ -762,4 +817,10 @@ Load_BaseAddr:
   dc.l    0
 ; Total number of bytes to read
 Load_TotalLength:
+  dc.l    0
+; received checksum
+Load_ReceivedChecksum:
+  dc.l    0
+; our computed checksum
+Load_LocalChecksum:
   dc.l    0

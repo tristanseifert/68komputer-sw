@@ -89,12 +89,18 @@ MC68681_Reset_Data:
   dc.b    MC68681_W_CRB, %00010000 ; reset MRn pointer
   dc.b    MC68681_W_MRnB, %00010011
   dc.b    MC68681_W_MRnB, %00000111
-  ; port B: set 9600 baud, set active mode, enable TX and RX
-  dc.b    MC68681_W_CRB, %10010000 ; clear RX BRG bit (X = 0)
-  dc.b    MC68681_W_CRB, %10110000 ; clear TX BRG bit (X = 0)
-  dc.b    MC68681_W_CSRB, %10111011
-  dc.b    MC68681_W_CRB, %11010000
-  dc.b    MC68681_W_CRB, %00000101
+  ; ; port B: set 9600 baud, set active mode, enable TX and RX
+  ; dc.b    MC68681_W_CRB, %10010000 ; clear RX BRG bit (X = 0)
+  ; dc.b    MC68681_W_CRB, %10110000 ; clear TX BRG bit (X = 0)
+  ; dc.b    MC68681_W_CSRB, %10111011
+  ; dc.b    MC68681_W_CRB, %11010000
+  ; dc.b    MC68681_W_CRB, %00000101
+  ; port B: set 14,400 baud, set active mode, enable TX and RX
+  dc.b    MC68681_W_CRB, %10000000 ; set RX BRG bit (X = 1)
+  dc.b    MC68681_W_CRB, %10100000 ; set TX BRG bit (X = 1)
+  dc.b    MC68681_W_CSRB, %01010101 ; select 14.4k baud
+  dc.b    MC68681_W_CRB, %11010000 ; set active mode
+  dc.b    MC68681_W_CRB, %00000101 ; enable tx/rx
 
   ; configure output port: OP3 = STATUS0, OP7 = STATUS1
   dc.b    MC68681_W_OPCR, %00000000
@@ -113,6 +119,37 @@ MC68681_Reset_Data:
   dc.b    $FF, 0
   even
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Disables the UART receivers.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_DisableRx:
+  lea     MC68681_Base, a0
+
+  ; reset, then enable receiver for A
+  move.b  #%00000010, MC68681_W_CRA(a0)
+
+  ; disable receivers for B
+  move.b  #%00000010, MC68681_W_CRB(a0)
+
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Enables the UART receivers.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_EnableRx:
+  lea     MC68681_Base, a0
+
+  ; reset, then enable receiver for A
+  move.b  #%00100000, MC68681_W_CRA(a0)
+  move.b  #%00000001, MC68681_W_CRA(a0)
+
+  ; reset, then enable receivers for B
+  move.b  #%00100000, MC68681_W_CRB(a0)
+  move.b  #%00000001, MC68681_W_CRB(a0)
+
+  rts
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

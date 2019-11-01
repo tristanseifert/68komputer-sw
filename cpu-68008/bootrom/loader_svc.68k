@@ -27,6 +27,10 @@ Svc_Table:
   dc.w    Svc_Getc-Svc_Table
   ; 0A: Read character from TTY (nonblocking)
   dc.w    Svc_Getc_Nonblocking-Svc_Table
+  ; 0B: Write string to TTY
+  dc.w    Svc_Puts-Svc_Table
+  ; 0C: Write a number as hexadecimal to TTY
+  dc.w    Svc_OutHex-Svc_Table
 Svc_Table_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -349,5 +353,68 @@ Svc_Getc_Nonblocking:
   rts
 
 .NoCharacter:
+  moveq   #-1, d0
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0B - Prints a null-terminated string to the TTY.
+;
+; INPUTS:
+;   a0: String to output
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Puts:
+  bra     Out_Puts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0C - Prints a hexadecimal number to the TTY with a given precision.
+;
+; INPUTS:
+;   d1: Number to output
+;   d2: Size of the number (1, 2, or 4)
+; OUTPUTS:
+;   d0: -1 if an argument was invalid, 0 otherwise.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_OutHex:
+  ; 4 bytes?
+  cmp.b   #4, d2
+  bne     .Check1
+
+  ; yup, so print a long
+  move.l  d1, d0
+  bsr     OutHex_Long
+  bra     .Done
+
+.Check1:
+  ; 1 byte?
+  cmp.b   #1, d2
+  bne     .Check2
+
+  ; yup, so print a byte
+  move.l  d1, d0
+  bsr     OutHex_Byte
+  bra     .Done
+
+.Check2:
+  ; 2 bytes?
+  cmp.b   #1, d2
+  bne     .InvalidSize
+
+  ; yup, so print a word
+  move.l  d1, d0
+  bsr     OutHex_Word
+  bra     .Done
+
+.Done:
+  ; done, clear d0
+  moveq   #0, d0
+  rts
+
+
+
+.InvalidSize:
   moveq   #-1, d0
   rts

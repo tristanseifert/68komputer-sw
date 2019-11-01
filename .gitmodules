@@ -1,0 +1,3 @@
+[submodule "cpu-68008/bootrom/lz4-68k"]
+	path = cpu-68008/bootrom/lz4-68k
+	url = https://github.com/arnaud-carre/lz4-68k.git
