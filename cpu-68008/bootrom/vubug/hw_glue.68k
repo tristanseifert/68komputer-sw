@@ -23,8 +23,8 @@ VUBUG_MC68681_ISR:
   ; acknowledge interrupt ("reset break irq flag" command to channel A)
   move.b  #%01010000, (MC68681_Base+MC68681_W_CRA)
 
-  ; TODO: jump back to command prompt
-  nop
+  ; jump back to command prompt
+  bra     VUBUG_Restart
 
 .checkChannelBRx:
   ; channel B receive?

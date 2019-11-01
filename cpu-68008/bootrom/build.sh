@@ -24,9 +24,9 @@ rm -f rom.bin rom_vubug.bin
 dd if=/dev/zero bs=131072 count=1 | LANG=C tr "\000" "\377" > rom.bin
 cp rom.bin rom_vubug.bin
 
-dd if=bootrom.bin of=rom.bin seek=0 conv=notrunc
-dd if=vubug/vubug.bin of=rom_vubug.bin seek=0 conv=notrunc
+dd if=bootrom.bin of=rom.bin seek=0 bs=1 count=32768 conv=notrunc
+dd if=vubug/vubug.bin of=rom_vubug.bin seek=0 bs=1 count=32768 conv=notrunc
 
 # into both ROMs, insert Enhanced BASIC at $8000
-dd if=ebasic/ebasic_trimmed.bin of=rom.bin seek=32768 bs=1 conv=notrunc
-dd if=ebasic/ebasic_trimmed.bin of=rom_vubug.bin seek=32768 bs=1 conv=notrunc
+dd if=ebasic/ebasic_trimmed.bin of=rom.bin seek=32768 bs=1 count=32768 conv=notrunc
+dd if=ebasic/ebasic_trimmed.bin of=rom_vubug.bin seek=32768 bs=1 count=32768 conv=notrunc

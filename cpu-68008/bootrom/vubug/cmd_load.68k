@@ -4,14 +4,19 @@
 ;
 ; Load - Load data from host
 ;
+; The load protocol is very simple: it is ASCII based and consists of the
+; following components:
+;
+; - 4-byte load base address (in HEX form)
+; - 4-byte length value
+; - Data bytes
+;
 ;****************************************
 ;*                                      *
 ;* Load is invoked as follows:          *
 ;*                                      *
 ;*       l<cr> - load from host with no *
 ;*               offset                 *
-;*       <ff> - same as l<cr> but used  *
-;*              only exiting emulator   *
 ;*       l xxxxxxxx - load with offset xxxxxxxx *
 ;*                                      *
 ;****************************************
@@ -45,60 +50,61 @@ Cmd_Load:
 
   ; we're going to use the host port load routine
   lea     lgch, a0
-.GetS:
-  ; read the character and wait to get 'S'
-  jsr     (a0)                    ;get S
+  bclr    #0, (echo)
 
-  cmp.b   #'S', d0
-  bne     .GetS
+.ReadAddress:
+  ; try to read the load address
+  lea     lgch, a0
+  bsr     InHex_Long
+  move.l  d0, (Load_BaseAddr)
 
-  ; get record type: 1 (record) or 9 (done)
-  jsr     (a0)                    ;get 1 or 9
+  lea     .MsgLoadAddr, a0
+  bsr     writs
+  move.l  (Load_BaseAddr), d0
+  bsr     OutHex_Long
 
-  ; did we get a 9? (done)
-  cmp.b   #'9', d0
-  beq     .LoadDone
+  ; acknowledge
+  moveq   #'.', d0
+  bsr     writu
 
-  ; was it 1?
-  cmp.b   #'1', d0
-  bne     .GetS
+.ReadLength:
+  ; then, try to read the total number of bytes
+  lea     lgch, a0
+  bsr     InHex_Long
+  move.l  d0, (Load_TotalLength)
 
-  ; get the byte count
-  bsr     InHex_Byte                    ;get byte count
-  move.l  d0, d1
+  lea     .MsgLoadLen, a0
+  bsr     writs
+  move.l  (Load_TotalLength), d0
+  bsr     OutHex_Long
 
-  ; subtract check byte length
-  subq.b  #4, d1
+  ; acknowledge
+  moveq   #'.', d0
+  bsr     writu
 
-  ; read the address and add offset
-  bsr     InHex_Word
-  add.l   (_pc), d0
-  movea.l d0, a1
+.PrepareForRead:
+  ; read in a byte at a time
+  move.l  (Load_TotalLength), d7
+  subq.l  #1, d7
 
-.ReceiveByte:
-  ; read a byte of data, then write it to memory
+  move.l  (Load_BaseAddr), a1
+
+  lea     lgch, a0
+
+.ReceiveLoop:
+  ; receive the byte…
   bsr     InHex_Byte
   move.b  d0, (a1)+
-  dbf     d1, .ReceiveByte
 
-  ; consume check word and newline
-  bsr     InHex_Word
+  ; …then acknowledge it
+  moveq   #'.', d0
+  bsr     writu
 
-  ; try to fetch another record
-  bra     .GetS
+  dbf     d7, .ReceiveLoop
 
 .LoadDone:
-  ; read byte count
-  jsr     (a0)
-  jsr     (a0)
-
-  ; get address from end
-  bsr     InHex_Word
-
   ; set the entrypoint address
-  add.l   (_pc), d0
-  move.l  d0, d1
-  move.l  d0, (_pc)
+  move.l  (Load_BaseAddr), (_pc)
 
   ; set up registers and clear register save area
   moveq   #0, d1
@@ -118,23 +124,23 @@ Cmd_Load:
   move.l  a0, (ar7)
 
   ; write the user PC
+  bsr     crlf
+
   lea     .MsgUserPC, a0
   bsr     writs
 
-  move.l  d1, d0
+  move.l  (_pc), d0
   bsr     OutHex_Long
-
-  ; read four more bytes
-  movea.l a2, a0
-
-  rept 4
-  jsr   (a0)
-  endr
 
   ; send the "load done" message
   lea     .MsgLoadDone, a0
   bsr     writs
 
+  ; clear receive buffers
+  move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
+  move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
+
+  ; re-enable echo flag
   bset    #0, (echo)
   rts
 
@@ -142,6 +148,14 @@ Cmd_Load:
 .MsgLoadStart:
   dc.b    lf,cr
   dc.b    "Starting load...", nul
+
+.MsgLoadAddr:
+  dc.b    lf,cr
+  dc.b    "Load address: $", nul
+
+.MsgLoadLen:
+  dc.b    lf, cr
+  dc.b    "Load size:    $", nul
 
 .MsgUserPC:
   dc.b    lf,cr
@@ -151,45 +165,3 @@ Cmd_Load:
   dc.b    lf,cr
   dc.b    "Load done!", nul
   even
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Upload - upload program from terminal port
-;
-;****************************************
-;*                                      *
-;* Upload is invoked as follows:        *
-;*                                      *
-;*       u<cr> - load from terminal     *
-;*               with no offset         *
-;*       u xxxxxxxx - load with offset xxxxxxxx *
-;*                                      *
-;****************************************
-;
-Cmd_Upload:
-  bsr     getch                   ;same as above, except that it
-        cmp.b   #$0d,d0                 ;uses the terminal port for the
-        beq     ulnoof                  ;load.
-        lea     getch,a0
-        bsr     InHex_Long
-        move.l  d0,_pc
-        bra     uld1
-ulnoof: move.l  #$0,_pc
-uld1:
-        ; this clears the UART A receive buffer
-        ; lea     ibuff,a1
-        ; move.w  #$0,head(a1)
-        ; move.w  #$ffff,tail(a1)
-        ; move.w  #$0,count(a1)
-        move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
-
-        ; lea     lmes,a0
-        ; bsr     writs
-        ; move.b  #$0d,d0
-        ; bsr     writu
-        lea     getch,a0
-        bclr    #$00,echo
-
-        ; TODO: make this work again
-        rts
-        ; bra     llp                     ;goes to the load routine above

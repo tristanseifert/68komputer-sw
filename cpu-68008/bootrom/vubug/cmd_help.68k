@@ -127,8 +127,6 @@ HelpTable:
   dc.w    HelpText_MsgHeader_Memory, HelpText_MsgText_Memory
   dc.w    $4c00           ;l - load
   dc.w    HelpText_MsgHeader_Load, HelpText_MsgDetail_Load
-  dc.w    $5500           ;u - upload
-  dc.w    HelpText_MsgHeader_Upload, HelpText_MsgDetail_Upload
   dc.w    $4400           ;d - dump
   dc.w    HelpText_MsgHeader_Dump, HelpText_MsgText_Dump
   dc.w    $5300           ;s - single step
@@ -219,20 +217,10 @@ HelpText_MsgHeader_Load:
   Help_Text_Header "L", "Load data from host via UART B"
   dc.b    nul
 
-HelpText_MsgHeader_Upload:
-  Help_Text_Header "U", "Load data from terminal via UART A"
-  dc.b    nul
-
 HelpText_MsgDetail_Load:
   Help_Text_Description "Load is invoked as follows:"
   Help_Text_Command "l<cr>", "Load from host with no offset"
   Help_Text_Command "l xxxxxxxx", "Load from host with offset xxxxxxxx"
-  dc.b    nul
-
-HelpText_MsgDetail_Upload:
-  Help_Text_Description "Upoad is invoked as follows:"
-  Help_Text_Command "u<cr>", "Load from terminal with no offset"
-  Help_Text_Command "u xxxxxxxx", "Load from terminal with offset xxxxxxxx"
   dc.b    nul
 
 

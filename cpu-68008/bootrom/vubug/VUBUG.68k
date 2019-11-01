@@ -314,15 +314,16 @@ writ:
   bra     writ                    ; when awakened check again
 
 .doWrite:
+  ; read the status register, check TXRDY bit (2), loop while clear
+  ; move.b  (MC68681_Base+MC68681_R_SRA), d0
+  btst    #2, (MC68681_Base+MC68681_R_SRA)
+  beq     .doWrite
+
+
   ; write character to DUART
   move.b  d0,(MC68681_Base+MC68681_W_THRA)
 
-  ; then, wait for tx to complete
-.wait:
-  ; read the status register, check TXRDY bit (2), loop while clear
-  move.b  (MC68681_Base+MC68681_R_SRA), d0
-  btst    #2, d0
-  beq     .wait
+  ; done!
   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -331,14 +332,13 @@ writ:
 ; passed in d0 to serial port (UART B)
 ;
 writu:
-  ; write character to DUART
-  move.b  d0,(MC68681_Base+MC68681_W_THRB)
+.waitTxRdy:
+  ; wait for TXRDY
+  btst    #2, (MC68681_Base+MC68681_R_SRB)
+  beq.s   .waitTxRdy
 
-  ; then, wait for tx to complete
-.wait:
-  move.b  (MC68681_Base+MC68681_R_SRB), d0
-  btst    #2, d0
-  beq     .wait
+  ; write character to DUART
+  move.b  d0, (MC68681_Base+MC68681_W_THRB)
   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -506,7 +506,7 @@ getl:
 
 InHex:
   ; save registers, and restore our counter
-  movem.l d1-d2, -(a7)
+  movem.l d1-d2, -(sp)
   move.w  t1, d2
   moveq   #0, d1
 
@@ -527,7 +527,7 @@ n1:
   move.l  d1, d0                   ;setup return in d0
 
   ; restore registers
-  movem.l (a7)+, d1-d2
+  movem.l (sp)+, d1-d2
   rts
 
 
@@ -539,10 +539,8 @@ n1:
 CommandTable:
   dc.w    $4d00           ;m - memory update
   dc.l    Cmd_MemUpdate
-  dc.w    $4c00           ;l - load from host (S-format)
+  dc.w    $4c00           ;l - load from host
   dc.l    Cmd_Load
-  dc.w    $5500           ;u - upload program from terminal port
-  dc.l    Cmd_Upload
   dc.w    $4400           ;d - dump contents of memory
   dc.l    Cmd_MemDump
   dc.w    $5300           ;s - single step
@@ -755,3 +753,13 @@ UART_B_Queue:
   dc.b  0, 0
   dc.l 0, 0, 0, 0
   even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Load variables
+
+; Base address of load
+Load_BaseAddr:
+  dc.l    0
+; Total number of bytes to read
+Load_TotalLength:
+  dc.l    0

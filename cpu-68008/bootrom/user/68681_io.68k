@@ -1,0 +1,67 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This is a quick and dirty program that flashes the two on-board LEDs. They
+; are connected to OP3 and OP7.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include our hardware defines
+  include "../hardware.68k"
+  include "../loader_api.68k"
+
+; start address
+  org     RAM_Base_App
+
+
+Entry:
+  ; set up
+  move.l  #RAM_Stack_Base, sp
+  lea     MC68681_Base, a0
+
+  ; perform this loop 4x
+  moveq   #3, d7
+  moveq   #0, d1
+
+.Loop:
+  ; clear both LEDs
+  move.b  #%10001000, MC68681_W_SOPBC(a0)
+
+  ; set the IO state according to d1
+  moveq   #0, d2
+  move.b  d1, d2
+
+  move.b  OutTable(pc, d2.w), d3
+  move.b  d3, MC68681_W_COPBC(a0)
+
+
+  ; change the LEDs for next time
+  addq.l  #1, d1
+
+  ; wait and repeat
+  bsr     Wait
+  dbf     d7, .Loop
+
+Done:
+  ; return to monitor
+  trap    #0
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+OutTable:
+  dc.b    %10001000
+  dc.b    %10000000
+  dc.b    %00000000
+  dc.b    %00001000
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Wastes a bunch of time
+Wait:
+  move.l  #$000FFFFF, d0
+
+.WaitLoop:
+  dbf     d0, .WaitLoop
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; align to 32 bytes
+  align   5
+  dc.b    "user/68681_io", 0
+  even
