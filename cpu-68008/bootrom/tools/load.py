@@ -31,22 +31,45 @@ if len(sys.argv) is not 5:
     print('usage: {exec} [binary path] [load address] [serial port] [baud rate]'.format(exec=sys.argv[0]))
     sys.exit(-1)
 
+# get some infos
+loadAddr = int(sys.argv[2], 0)
+size = os.path.getsize(sys.argv[1])
+
+# calculate the checksum over the file
+cprint('• Calculating file checksum', attrs=['bold'])
+
+checksum = 0
+
+with open(sys.argv[1], "rb") as f:
+    byte = f.read(1)
+
+    while byte:
+        # just sum all bytes up
+        checksum += ord(byte)
+        # read the next byte
+        byte = f.read(1)
+
 # open and configure the serial port with timeout of 1sec
 port = serial.Serial(sys.argv[3], int(sys.argv[4]), timeout=1)
 
-# print the load address and wait for an ack
-cprint('Sending load address', attrs=['bold'])
-port.write('{load:08x}'.format(load=int(sys.argv[2], 0)).encode('ascii'))
+# send the load address and wait for an ack
+cprint('• Sending load address: ${addr:08x}'.format(addr=loadAddr), attrs=['bold'])
+port.write('{load:08x}'.format(load=loadAddr).encode('ascii'))
 waitForAck(port)
 
-# get the file size and print that
-size = os.path.getsize(sys.argv[1])
+# send the checksum and wait for an ack
+cprint('• Sending checksum: ${check:08x}'.format(check=checksum), attrs=['bold'])
+port.write('{check:08x}'.format(check=checksum).encode('ascii'))
+waitForAck(port)
 
-cprint('Sending file size', attrs=['bold'])
+# send the file size
+cprint('• Sending file size: {size} bytes'.format(size=size), attrs=['bold'])
 port.write('{size:08x}'.format(size=size).encode('ascii'))
 waitForAck(port)
 
 # then, send each byte of the file
+cprint('• Sending payload', attrs=['bold'])
+
 with progressbar.ProgressBar(max_value=size) as bar:
     with open(sys.argv[1], "rb") as f:
         byte = f.read(1)
