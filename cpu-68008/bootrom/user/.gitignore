@@ -2,3 +2,9 @@
 68681_io.bin
 68681_io.hex
 68681_io.lst
+
+# ds1244 test
+ds1244_test.bin
+ds1244_test.lst
+ds1244_set.bin
+ds1244_set.lst

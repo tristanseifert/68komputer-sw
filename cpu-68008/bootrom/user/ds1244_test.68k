@@ -1,0 +1,130 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This is a quick and dirty program that allows us to read from the real time
+; clock on the board, the DS1244.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include our hardware defines
+  include "../hardware.68k"
+  include "../loader_api.68k"
+
+; start address
+  org     RAM_Base_App
+
+
+Entry:
+  ; set up the stack
+  move.l  #RAM_Stack_Base, sp
+
+  ; print what this is
+  lea     What, a1
+  moveq   #$b, d0
+  trap    #1
+
+  ; reset RTC
+  bsr     RTC_Reset
+
+  ; attempt to read from the RTC
+  bsr     RTC_Read
+
+  ; Output the buffers
+  move.b  (Loader_TimeMSeconds), d0
+  lea     Msg_Millis, a1
+  bsr     OutMessage
+
+  move.b  (Loader_TimeSeconds), d0
+  lea     Msg_Secs, a1
+  bsr     OutMessage
+
+  move.b  (Loader_TimeMinutes), d0
+  lea     Msg_Mins, a1
+  bsr     OutMessage
+
+  move.b  (Loader_TimeHours), d0
+  lea     Msg_Hours, a1
+  bsr     OutMessage
+
+  move.b  (Loader_DateDayOfWeek), d0
+  lea     Msg_DayOfWeek, a1
+  bsr     OutMessage
+
+  move.b  (Loader_DateDay), d0
+  lea     Msg_Day, a1
+  bsr     OutMessage
+
+  move.b  (Loader_DateMonth), d0
+  lea     Msg_Month, a1
+  bsr     OutMessage
+
+  move.b  (Loader_DateYear), d0
+  lea     Msg_Year, a1
+  bsr     OutMessage
+
+Done:
+  ; return to monitor
+  trap    #0
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; In a1: The message; in d0: the value (byte)
+OutMessage:
+  move.l  d0, d6
+
+  ; print the message first
+  moveq   #$b, d0
+  trap    #1
+
+  ; print value
+  move.l  d6, d2
+  moveq   #1, d3
+  moveq   #$c, d0
+  trap    #1
+
+  ; done
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Newline:
+  dc.b  $d, $a, 0
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Msg_Millis:
+  dc.b  $d, $a
+  dc.b  "Milliseconds: ", 0
+
+Msg_Secs:
+  dc.b  $d, $a
+  dc.b  "     Seconds: ", 0
+
+Msg_Mins:
+  dc.b  $d, $a
+  dc.b  "     Minutes: ", 0
+
+Msg_Hours:
+  dc.b  $d, $a
+  dc.b  "       Hours: ", 0
+
+Msg_DayOfWeek:
+  dc.b  $d, $a
+  dc.b  " Day of Week: ", 0
+
+Msg_Day:
+  dc.b  $d, $a
+  dc.b  "         Day: ", 0
+
+Msg_Month:
+  dc.b  $d, $a
+  dc.b  "       Month: ", 0
+
+Msg_Year:
+  dc.b  $d, $a
+  dc.b  "        Year: ", 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include RTC routines
+  include "../rtc.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+What:
+  dc.b    $d, $a
+  dc.b    " **** Reading DS1244: ****", 0
+  even

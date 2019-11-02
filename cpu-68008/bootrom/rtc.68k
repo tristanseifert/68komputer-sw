@@ -113,9 +113,10 @@ RTC_Read:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTC_Write:
   ; TODO: update RAM buffer
+  bsr     RTC_UpdateBuffer
 
   ; write magic sequence
-  bsr.w   RTC_WriteMagic
+  bsr     RTC_WriteMagic
 
   ; write 64 bits from buffer
   lea     (RTC_Time_Reg), a0
@@ -127,7 +128,7 @@ RTC_Write:
   ; is this the start of a byte?
   move.b  d0, d2
   and.b   #$7, d2
-  bne.s   .notStart
+  bne     .notStart
 
   ; if so, read the byte
   move.b   (a1)+, d1
@@ -143,6 +144,49 @@ RTC_Write:
 
   rts
 
+; Converts the in-memory values into the buffer that's written to the RTC.
+RTC_UpdateBuffer:
+  ; this is the buffer to write to
+  lea     Loader_RTCBuffer, a0
+
+  ; first, write the milliseconds
+  move.b  (Loader_TimeMSeconds), (a0)+
+
+  ; then, the seconds
+  move.b  (Loader_TimeSeconds), d0
+  and.b   #$7F, d0
+  move.b  d0, (a0)+
+
+  ; then, minutes
+  move.b  (Loader_TimeMinutes), d0
+  and.b   #$7F, d0
+  move.b  d0, (a0)+
+
+  ; next up, the hours: clear the 12 hour flag as well
+  move.b  (Loader_TimeHours), d0
+  and.b   #$3F, d0
+  move.b  d0, (a0)+
+
+  ; now, the day of week. make sure that the oscillator bit is cleared, but
+  ; reset bit is set (such that reset pin is ignored)
+  move.b  (Loader_DateDayOfWeek), d0
+  and.b   #$07, d0
+  or.b    #$10, d0
+  move.b  d0, (a0)+
+
+  ; write the day of month
+  move.b  (Loader_DateDay), d0
+  and.b   #$3f, d0
+  move.b  d0, (a0)+
+
+  ; write the month
+  move.b  (Loader_DateMonth), d0
+  and.b   #$1f, d0
+  move.b  d0, (a0)+
+
+  ; write the year
+  move.b  (Loader_DateYear), (a0)
+  rts
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,0 +1,133 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This allows the user to set the DS1244 clock.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include our hardware defines
+  include "../hardware.68k"
+  include "../loader_api.68k"
+
+; start address
+  org     RAM_Base_App
+
+
+Entry:
+  ; set up the stack
+  move.l  #RAM_Stack_Base, sp
+
+  ; print what this is
+  lea     What, a1
+  moveq   #$b, d0
+  trap    #1
+
+  ; reset RTC
+  bsr     RTC_Reset
+
+  ; attempt to read from the RTC
+  ; bsr     RTC_Read
+
+  ; clear milliseconds
+  moveq   #0, d0
+  move.b  d0, (Loader_TimeMSeconds)
+
+  ; Read the buffers new values
+  lea     Msg_Secs, a1
+  bsr     InMessage
+  move.b  d0, (Loader_TimeSeconds)
+
+  lea     Msg_Mins, a1
+  bsr     InMessage
+  move.b  d0, (Loader_TimeMinutes)
+
+  lea     Msg_Hours, a1
+  bsr     InMessage
+  move.b  d0, (Loader_TimeHours)
+
+  ; lea     Msg_DayOfWeek, a1
+  ; bsr     InMessage
+  moveq   #$07, d0
+  move.b  d0, (Loader_DateDayOfWeek)
+
+  ; lea     Msg_Day, a1
+  ; bsr     InMessage
+  moveq   #$02, d0
+  move.b  d0, (Loader_DateDay)
+
+  ; lea     Msg_Month, a1
+  ; bsr     InMessage
+  moveq   #$11, d0
+  move.b  d0, (Loader_DateMonth)
+
+  ; lea     Msg_Year, a1
+  ; bsr     InMessage
+  moveq   #$19, d0
+  move.b  d0, (Loader_DateYear)
+
+  ; write it to the blazer
+  bsr     RTC_Write
+
+Done:
+  ; return to monitor
+  trap    #0
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; In a1: The message; out d0: the value (byte)
+InMessage:
+  ; print the message first
+  moveq   #$b, d0
+  trap    #1
+
+  ; read value
+  move.l  d6, d2
+  moveq   #1, d3
+  moveq   #$d, d0
+  trap    #1
+
+  ; move.l  d1, d0
+
+  ; done
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Newline:
+  dc.b  $d, $a, 0
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Msg_Secs:
+  dc.b  $d, $a
+  dc.b  "     Seconds: ", 0
+
+Msg_Mins:
+  dc.b  $d, $a
+  dc.b  "     Minutes: ", 0
+
+Msg_Hours:
+  dc.b  $d, $a
+  dc.b  "       Hours: ", 0
+
+Msg_DayOfWeek:
+  dc.b  $d, $a
+  dc.b  " Day of Week: ", 0
+
+Msg_Day:
+  dc.b  $d, $a
+  dc.b  "         Day: ", 0
+
+Msg_Month:
+  dc.b  $d, $a
+  dc.b  "       Month: ", 0
+
+Msg_Year:
+  dc.b  $d, $a
+  dc.b  "        Year: ", 0
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include RTC routines
+  include "../rtc.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+What:
+  dc.b    $d, $a
+  dc.b    " **** Setting Clock: ****", 0
+  even

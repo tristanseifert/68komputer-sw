@@ -31,6 +31,8 @@ Svc_Table:
   dc.w    Svc_Puts-Svc_Table
   ; 0C: Write a number as hexadecimal to TTY
   dc.w    Svc_OutHex-Svc_Table
+  ; 0D: Reads a number as hexadecimal from the TTY
+  dc.w    Svc_InHex-Svc_Table
 Svc_Table_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -412,6 +414,54 @@ Svc_OutHex:
 .Done:
   ; done, clear d0
   moveq   #0, d0
+  rts
+
+
+
+.InvalidSize:
+  moveq   #-1, d0
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0D - Reads a hexadecimal number from the TTY with a given precision.
+;
+; INPUTS:
+;   d3: Size of the number (1, 2, or 4)
+; OUTPUTS:
+;   d0: Number read from the terminal
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_InHex:
+  ; set up for terminal input
+  lea     getch, a0
+
+  ; 4 bytes?
+  cmp.b   #4, d3
+  bne     .Check1
+
+  ; yup, so read a long
+  bsr     InHex_Byte
+  bra     .Done
+
+.Check1:
+  ; 1 byte?
+  cmp.b   #1, d3
+  bne     .Check2
+
+  ; yup, so read a byte
+  bsr     InHex_Byte
+  bra     .Done
+
+.Check2:
+  ; 2 bytes?
+  cmp.b   #1, d3
+  bne     .InvalidSize
+
+  ; yup, so read a word
+  bsr     InHex_Byte
+  bra     .Done
+
+.Done:
   rts
 
 
