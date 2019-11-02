@@ -191,28 +191,23 @@ abpr:   lea     abmes,a0
 ; Exit
 ;
 Svc_Exit_Trap:
-  movem.l #$ffff,dr0              ;save register values d0-a7
-  move.l  usp,a6                  ;save user stack pointer
-  move.l  a6,ar7
-  move.w  (a7)+,_sr               ;save status register
-  move.l  (a7)+,_pc               ;save pc
-  lea     stack,a7                ;reset system mode stack
-  pea     comm                    ;fake return to comm
-  move.w  ssri,-(a7)              ;ditto for status
+  ; reset our stack (doesn't matter since we're returning anyways)
+  move.l  #stack, sp
 
-  ; print pls
-  lea     .MsgExit, a0
-  bsr     writs
+  ; print a message
+  ; lea     .MsgExit, a0
+  ; bsr     writs
 
-  ; also, reset 68681 state
-  move.w   #0, (UART_IRQ_Ignored)
-  bsr     MC68681_Reset
+  ; wait for character to finish writing
+; .waitTxRdy:
+;   ; wait for TXRDY
+;   btst    #2, (MC68681_Base+MC68681_R_SRA)
+;   beq.s   .waitTxRdy
 
-  ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
-  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
-  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
-
-  rte
+  ; reset the 68681 (to fix it from any applications)
+  ; bsr     MC68681_Reset
+  ; then, jump to the restart handler
+  bra     VUBUG_Restart
 
 .MsgExit:
   dc.b    cr, lf, $E, $60, $F, " Return to monitor", cr, lf, nul

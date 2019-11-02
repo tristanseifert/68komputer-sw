@@ -11,28 +11,45 @@
 
 
 Entry:
-  ; set up
+  ; set up the stack
   move.l  #RAM_Stack_Base, sp
-  lea     MC68681_Base, a0
+
+  ; print what this is
+  lea     What, a1
+  moveq   #$b, d0
+  trap    #1
+
+  ; set up
+  lea     MC68681_Base, a5
 
   ; perform this loop 4x
-  moveq   #3, d7
-  moveq   #0, d1
+  moveq   #(OutTable_End-OutTable-1), d7
+  moveq   #0, d6
 
 .Loop:
   ; clear both LEDs
-  move.b  #%10001000, MC68681_W_SOPBC(a0)
+  move.b  #%10001000, MC68681_W_SOPBC(a5)
 
   ; set the IO state according to d1
   moveq   #0, d2
-  move.b  d1, d2
+  move.b  d6, d2
 
   move.b  OutTable(pc, d2.w), d3
-  move.b  d3, MC68681_W_COPBC(a0)
+  move.b  d3, MC68681_W_COPBC(a5)
+
+  ; write the number
+  lea     Newline, a1
+  moveq   #$b, d0
+  trap    #1
+
+  move.l  d6, d2
+  moveq   #1, d3
+  moveq   #$c, d0
+  trap    #1
 
 
   ; change the LEDs for next time
-  addq.l  #1, d1
+  addq.l  #1, d6
 
   ; wait and repeat
   bsr     Wait
@@ -49,19 +66,26 @@ OutTable:
   dc.b    %10000000
   dc.b    %00000000
   dc.b    %00001000
+OutTable_End:
   even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Wastes a bunch of time
 Wait:
-  move.l  #$000FFFFF, d0
+  move.l  #$001FFFFF, d0
 
 .WaitLoop:
   dbf     d0, .WaitLoop
   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Newline:
+  dc.b  $d, $a, 0
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; align to 32 bytes
   align   5
+What:
   dc.b    "user/68681_io", 0
   even

@@ -200,7 +200,7 @@ prg_strt
 
 ; Use these two lines when running from ROM
 ram_addr	EQU	RAM_Base_App		; RAM start address
-ram_size	EQU	(RAM_Size-(RAM_Base_App-RAM_Base)-$200)		; RAM size
+ram_size	EQU	(RAM_LZ4_App_Base-RAM_Base_App)		; RAM size
 
 ; Use these two lines when running from RAM
 ;ram_addr	EQU	$04000		; RAM start address

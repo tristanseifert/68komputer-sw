@@ -69,8 +69,8 @@ nobrk		EQU	0				; null response to INPUT causes a break
 	INCLUDE	"basic68k.inc"
 							; RAM offset definitions
 
-; base our code in ROM at $8000
-	org $8000
+; we're decompressed to RAM
+	org RAM_LZ4_App_Base
 
 Entry:
 	; turn off 68681 receive interrupts

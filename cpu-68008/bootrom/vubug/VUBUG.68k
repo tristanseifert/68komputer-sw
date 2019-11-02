@@ -466,7 +466,7 @@ VUBUG_Restart:
   ; restore all the registers we backed up earlier
   ; movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
 
-  ; move    #$2700, sr
+  move    #$2700, sr
 
   ; disable receivers
   bsr     MC68681_DisableRx
@@ -481,6 +481,11 @@ VUBUG_Restart:
   move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
   move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
 
+  ; enable channel a/b rx, channel a break
+  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+
+  ; then, enable the receivers
   bsr     MC68681_EnableRx
 
 
@@ -633,6 +638,9 @@ comm:
   lea     Msg_Prompt, a0
   bsr     writs
 
+  ; ensure echo is on
+  bsr     Echo_On
+
   ; read a character in, uppercase it, and begin searching the command table
   bsr     getch
   and.b   #$5f, d0
@@ -667,8 +675,40 @@ clp:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Starts the BASIC interpreter (expect this to be at $8000)
 Cmd_StartBasic:
-  move.l  #$8000, (_pc)
+  ; move.l  #$8000, (_pc)
+
+  bsr     Echo_Off
+
+  ; print message
+  lea     .MsgDecompressing, a0
+  bsr     writs
+
+  ; load the app and st ore its address
+  lea     $00008008, a0
+  bsr     App_Load
+  move.l  a0, (_pc)
+
+  ; print the address
+  lea     .MsgLoadedTo, a0
+  bsr     writs
+
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+
+  bsr     crlf
+
+  ; go and run it
+  bsr     Echo_On
+  bsr     crlf
+
   bra     Cmd_Go_RunProgram
+
+.MsgDecompressing:
+  dc.b    cr, lf
+  dc.b    "Decompressing BASIC...", cr, lf, nul
+.MsgLoadedTo:
+  dc.b    "Loaded to $", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; include interrupt handlers
@@ -688,7 +728,35 @@ Cmd_StartBasic:
 ; library routines
   include "lib.68k"
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; LZ4 decompression (supports compressed apps in ROM)
+; put the input buffer in a0, output in a1
+Lib_LZ4:
+; from lz4-68k/lz4_frame.asm
+lz4_frame_depack:
+	cmpi.l	#$04224d18,(a0)+	; LZ4 frame MagicNb
+	bne.s	.Error
+
+	move.b	(a0),d0
+	andi.b	#%11001001,d0		; check version, no depacked size, and no DictID
+	cmpi.b	#%01000000,d0
+	bne.s	.Error
+
+	; read 32bits block size without movep (little endian)
+	move.b	6(a0),d0
+	lsl.w	#8,d0
+	move.b	5(a0),d0
+	swap	d0
+	move.b	4(a0),d0
+	lsl.w	#8,d0
+	move.b	3(a0),d0
+	lea		7(a0),a0			; skip LZ4 block header + packed data size
+
+	bra.s	lz4_depack
+
+.Error:
+  illegal
+
   include "lz4-68k/lz4_fastest.asm"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -709,6 +777,8 @@ Info_BuildDate:
 ; loader API
   include "../loader_svc.68k"
 
+; app loading
+  include "apps/api.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; stub tick handler
@@ -719,8 +789,6 @@ Loader_Handle_Tick:
 ; Bootloader API entry point: this gives application programs a simple API to
 ; interact with the hardware
   include "loader_entry.68k"
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Monitor data area: this will be located in RAM and we just don't load it

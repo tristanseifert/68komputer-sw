@@ -115,5 +115,10 @@ RAM_Loader                  = (RAM_Monitor+$800)
 ; base address for app variables
 RAM_Base_App                = (RAM_Loader+$1000)
 
+; reserve a 64K area for decompressed ROM apps
+; this is only used by the loader, but this is the address that any binary is
+; decompressed to.
+RAM_LZ4_App_Base            = (RAM_Base + RAM_Size - $10000)
+
 ; the last $200 bytes of RAM ($80000 - $FFFFF) are reserved as stack
 RAM_Stack_Base              = RAM_Base + RAM_Size
