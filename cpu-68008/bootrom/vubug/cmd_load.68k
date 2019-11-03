@@ -25,16 +25,25 @@
 ;****************************************
 ;
 Cmd_Load:
+  ; clear the "run after load" flag
+  sf.b    (Load_RunAfterLoad)
+
   ; did we receive a <cr>? if so, use an offset of 0
   bsr     getch
   cmp.b   #$0d, d0
   beq     .NoOffset
+  ; was it the character 'g'? if so, set the flag to start the run
+  cmp.b   #'g', d0
+  beq     .RunAfter
 
   ; read the offset in
   lea     getch, a0
   bsr     InHex_Long
   move.l  d0, (_pc)
   bra     .StartLoad
+
+.RunAfter:
+  st.b    (Load_RunAfterLoad)
 
 .NoOffset:
   ; set default address
@@ -111,10 +120,10 @@ Cmd_Load:
   bsr     OutHex_Long
 
   ; Print the "Remaining bytes" message
-  ; lea     .MsgLoadRemaining, a0
-  ; bsr     writs
-  ; move.l  (Load_TotalLength), d0
-  ; bsr     OutHex_Long
+  lea     .MsgLoadRemaining, a0
+  bsr     writs
+  move.l  (Load_TotalLength), d0
+  bsr     OutHex_Long
 
 .PrepareForRead:
   ; prepare a "checksum" reg and a temp reg
@@ -136,7 +145,7 @@ Cmd_Load:
   bsr     Load_UartTx
 
   lea     Load_UartRx, a0
-  ; move.l  a0, a2
+  move.l  a0, a2
 
 .ReceiveLoop:
   ; receive the byte…
@@ -152,13 +161,13 @@ Cmd_Load:
   dbf     d5, .ByteLoop
   ; endr
 
-  ; ; update remaining bytes counter
-  ; lea     .MsgBackspace8, a0
-  ; bsr     writs
-  ; move.l  d7, d0
-  ; bsr     OutHex_Long
+  ; update remaining bytes counter
+  lea     .MsgBackspace8, a0
+  bsr     writs
+  move.l  d7, d0
+  bsr     OutHex_Long
 
-  ; move.l  a2, a0
+  move.l  a2, a0
 
   ; …then acknowledge it
   moveq   #'.', d0
@@ -179,9 +188,13 @@ Cmd_Load:
   cmp.l   (Load_ReceivedChecksum), d6
   beq     .ChecksumValid
 
+  ; the checksum validation failed, print a message
 .ChecksumError:
   lea     .MsgChecksumFailed, a0
   bsr     writs
+
+  ; then clear the go-after-load flag and exit
+  sf.b    (Load_RunAfterLoad)
   bra     .Exit
 
 .ChecksumValid:
@@ -205,15 +218,6 @@ Cmd_Load:
   lea     ustck, a0
   move.l  a0, (ar7)
 
-  ; write the user PC
-  bsr     crlf
-
-  lea     .MsgUserPC, a0
-  bsr     writs
-
-  move.l  (_pc), d0
-  bsr     OutHex_Long
-
   ; send the "load done" message
   lea     .MsgLoadDone, a0
   bsr     writs
@@ -232,8 +236,29 @@ Cmd_Load:
 
   ; re-enable echo flag
   bsr     Echo_On
-  rts
 
+  ; check if we're supposed to run the program
+  tst.b   (Load_RunAfterLoad)
+  beq     .NoRun
+
+  ; write the user PC
+  lea     .MsgUserPC, a0
+  bsr     writs
+
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+
+  ; lea     .MsgProgramDivider, a0
+  ; bsr     writs
+  bsr     crlf
+  bsr     Out_Divider
+  bsr     crlf
+
+  ; jump to the routine to run a user program
+  bra     Cmd_Go_RunProgram
+
+.NoRun:
+  rts
 
 .MsgLoadStart:
   dc.b    lf,cr
@@ -259,7 +284,7 @@ Cmd_Load:
   dc.b    $1b, "[8D", nul
 
 .MsgLocalChecksum:
-  dc.b    lf, cr
+  dc.b    cr
   dc.b    "Our Checksum:  $", nul
 
 .MsgChecksumFailed:
@@ -268,8 +293,8 @@ Cmd_Load:
   dc.b    "Checksum verification failed!", nul
 
 .MsgUserPC:
-  dc.b    lf,cr
-  dc.b    "User PC == ", nul
+  dc.b    lf, cr
+  dc.b    "Running program from user PC: $", nul
 
 .MsgLoadDone:
   dc.b    lf,cr

@@ -5,13 +5,17 @@
 ; Generic trap handler
 ;
 Exception_Generic:
-ghlr:   movem.l #$ffff,dr0              ;save all registers d0-a7
-        move.l  usp,a6                  ;get user stack pointer
-        move.l  a6,ar7                  ;and save it
-        move.w  (a7)+,_sr               ;save current SR
-        move.l  (a7)+,_pc               ;save current return value
-        pea     comm                    ;set for return to comm
-        move.w  ssri,-(a7)              ;enable interrupts on return
+ghlr:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  move.w  (a7)+, (_sr)
+  move.l  (a7)+, (_pc)
+
+  ; fake a return to command interpreter
+  pea     comm
+  move.w  ssri, -(a7)
 
 ghpr:
   lea     Trap_WriteMsgWithPc_MsgTrap, a0
@@ -107,6 +111,8 @@ bhlr:
 tlocm:  dc.b    lf,cr
         dc.b    "PC == ", nul
         dc.b    nul
+
+Exception_Trace:
 thlr:   move.w  ssrn,sr                 ;disable interrupts
         move.l  a0,ar0                  ;save used registers
         move.l  d0,dr0
@@ -155,33 +161,73 @@ tr:     rte
 ;
 ; See generic handler for details
 ;
-prmes:  dc.b    lf,cr
-        dc.b    "Privilege Error at ", nul
-phlr:   movem.l #$ffff,dr0              ;regs d0-a7
-        move.l  usp,a6
-        move.l  a6,ar7
-        move.w  (a7)+,_sr
-        move.l  (a7)+,_pc
-        pea     comm
-        move.w  ssri,-(a7)
-prpr:   lea     prmes,a0
-        bra     Trap_WriteMsgWithPc
+Exception_Privilege:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  move.w  (a7)+, (_sr)
+  move.l  (a7)+, (_pc)
+
+  ; build a stack frame to return back to the interpreter
+  pea     comm
+  move.w  ssri, -(a7)
+
+  ; print the message
+  lea     .Msg, a0
+  bra     Trap_WriteMsgWithPc
+
+.Msg:
+  dc.b    lf,cr,$7
+  dc.b    "Privilege Error at $", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; address error/bus error trap
 ;
-abmes:  dc.b    lf,cr
-        dc.b    "address error at ", nul
-abhlr:  movem.l #$ffff,dr0              ;regs d0-a7
-        move.l  usp,a6
-        move.l  a6,ar7                  ;same as above but...
-        move.w  $8(a7),_sr              ;status register is deeper in stack
-        move.l  $a(a7),_pc              ;also pc
-        pea     comm
-        move.w  ssri,-(a7)
-abpr:   lea     abmes,a0
-        bra     Trap_WriteMsgWithPc
+Exception_BusErr:
+  st.b    (Exception_WasBus)
+  bra     Exception_BusAddr_Handle
+
+Exception_Address:
+  sf.b    (Exception_WasBus)
+
+Exception_BusAddr_Handle:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  ; the status and PC are deeper in the stack for an address or bus error
+  move.w  $8(a7), (_sr)
+  move.l  $a(a7), (_pc)
+  ; otherwise, continue as normal
+  pea     comm
+  move.w  ssri, -(a7)
+
+  ; was it a bus or an address error?
+  tst.b   (Exception_WasBus)
+  bne     .PrintBus
+
+.PrintAddr:
+  ; print message for address error
+  lea     .MsgAddr, a0
+  bra     Trap_WriteMsgWithPc
+
+.PrintBus:
+  ; print message for bus error
+  lea     .MsgBus, a0
+  bra     Trap_WriteMsgWithPc
+
+.MsgAddr:
+  dc.b    lf, cr, $7
+  dc.b    "Address error at $", nul
+  even
+
+.MsgBus:
+  dc.b    lf, cr, $7
+  dc.b    "Bus error at $", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;

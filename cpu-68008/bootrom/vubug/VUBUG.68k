@@ -84,57 +84,60 @@ iloc    =       $0002
 ; herein as this will destroy the vector
 ; for iterrupts, breakpoints...
 ;
-        org     $0                      ;Reset Vector
-        dc.l    stack                   ;system stack
-        dc.l    start                   ;initial pc
-        dc.l    abhlr                   ;bus error
-        dc.l    abhlr                   ;address error
-        dc.l    bhlr                    ;illegal instruction vector
-        dc.l    Exception_Generic                    ;zero divide
-        dc.l    Exception_Generic                    ;chk
-        dc.l    Exception_Generic                    ;trapv
-        dc.l    phlr                    ;privileged instruction trap
-        dc.l    thlr                    ;trace handler
-        dc.l    bhlr                    ;emulator trap 1010
-        dc.l    bhlr                    ;emulator trap 1111
+  org     $0
+  ; system stack and entry point
+  dc.l    stack                 ;system stack
+  dc.l    start                 ;initial pc
 
-        dc.l    Exception_Reserved
-        dc.l    Exception_Reserved
-        dc.l    Exception_Reserved
+  ; bus/instruction errors
+  dc.l    Exception_BusErr      ;bus error
+  dc.l    Exception_Address     ;address error
+  dc.l    bhlr                  ;illegal instruction vector
+  ; program errors
+  dc.l    Exception_Generic                    ;zero divide
+  dc.l    Exception_Generic                    ;chk
+  dc.l    Exception_Generic                    ;trapv
+  ; debugging
+  dc.l    Exception_Privilege   ; privileged instruction trap
+  dc.l    Exception_Trace       ; trace handler
+  ; coprocessor traps
+  dc.l    bhlr                  ; emulator trap 1010
+  dc.l    bhlr                  ; emulator trap 1111
 
-        dc.l    Exception_Generic                    ;uninitialized iterrupt
-
-        ; a few reserved vectors
-        dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
-        dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
-        dc.l    Exception_Reserved, Exception_Reserved
-
-        dc.l    IRQ_Unused                    ;spurious iterrupt
-        dc.l    IRQ_Unused                    ; irq1: unused
-        dc.l    VUBUG_MC68681_ISR       ; irq2: DUART
-        dc.l    IRQ_Unused                    ;user auto-vectors
-        dc.l    IRQ_Unused
-        dc.l    IRQ_Unused
-        dc.l    IRQ_Unused
-        dc.l    IRQ_Unused
-
-        ; trap vectors
-        dc.l    Svc_Exit_Trap
-        dc.l    Svc_Entry_Trap
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
-        dc.l    Trap_Unused
+  ; some reserved vectors
+  dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+  ; uninitialized interrupt
+  dc.l    RAM_Vector_Irq_Uninitialized
+  ; more reserved vectors
+  dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+  dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+  dc.l    Exception_Reserved, Exception_Reserved
+  ; interrupts
+  dc.l    RAM_Vector_Irq_Spurious
+  dc.l    RAM_Vector_Irq1
+  dc.l    RAM_Vector_Irq2
+  dc.l    RAM_Vector_Irq3
+  dc.l    RAM_Vector_Irq4
+  dc.l    RAM_Vector_Irq5
+  dc.l    RAM_Vector_Irq6
+  dc.l    RAM_Vector_Irq7
+  ; trap vectors
+  dc.l    RAM_Vector_Trap0
+  dc.l    RAM_Vector_Trap1
+  dc.l    RAM_Vector_Trap2
+  dc.l    RAM_Vector_Trap3
+  dc.l    RAM_Vector_Trap4
+  dc.l    RAM_Vector_Trap5
+  dc.l    RAM_Vector_Trap6
+  dc.l    RAM_Vector_Trap7
+  dc.l    RAM_Vector_Trap8
+  dc.l    RAM_Vector_Trap9
+  dc.l    RAM_Vector_TrapA
+  dc.l    RAM_Vector_TrapB
+  dc.l    RAM_Vector_TrapC
+  dc.l    RAM_Vector_TrapD
+  dc.l    RAM_Vector_TrapE
+  dc.l    RAM_Vector_TrapF
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;+++++++++++++++++++++++++++++++++++++++++
@@ -208,6 +211,7 @@ Msg_Prompt:
 start:
   ; set up hardware
   move    #$2700, sr
+  bsr     RAM_Vector_Init
 
   bsr     MC68681_Reset
   bsr     MC68681_DisableRx
@@ -216,7 +220,7 @@ start:
 
   ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
   move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
-  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+  ; move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
 ; memory test
 ;         move.w  #$ffff,d0               ;load $ffff for first memory test
@@ -309,10 +313,60 @@ done:
   bra     comm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Installs the default set of vectors.
+RAM_Vector_Init:
+  ; disable interrupts now
+  move    sr, -(sp)
+  move    #$2700, sr
+
+  ; first, reset each vector to rte
+  lea     RAM_Vector_Irq_Uninitialized, a0
+  moveq   #((RAM_Vectors_End-RAM_Vectors_Start)/16)-1, d0
+
+  move.l  #$4E734E71, d1 ; rte/nop
+  move.l  #$4E714E71, d2 ; nop/nop
+
+.ClearLoop:
+  move.l  d1, (a0)+
+  move.l  d2, (a0)+
+  move.l  d2, (a0)+
+  move.l  d2, (a0)
+  dbf     d0, .ClearLoop
+
+  ; install our 68681 vector
+  lea     RAM_Vector_Irq2, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #VUBUG_MC68681_ISR, (a0)+
+
+  ; install the trap 0 (exit) handler
+  lea     RAM_Vector_Trap0, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #Svc_Exit_Trap, (a0)
+
+  ; install the trap 1 (loader services) handler
+  lea     RAM_Vector_Trap1, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #Svc_Entry_Trap, (a0)
+
+  ; we've finished, re-enable interrupts
+  move    (sp)+, sr
+  rts
+
+.Jmp:
+  jmp     $12345678
+.Jsr:
+  jsr     $12345678
+.Rte:
+  rte
+.Nop:
+  nop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Generalized write facility writes 1 byte
 ; passed in d0 to tty. (UART A)
 ;
+Out_Putc:
 writ:
   btst    #0, ctrls               ; Is ctrl-s active
   beq     .doWrite                ; no, so write character
@@ -365,6 +419,28 @@ writs:
 
 .end:
   rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Writes a horizontal divider to the screen.
+Out_Divider:
+  ; put terminal into graphics mode
+  moveq   #$E, d0
+  bsr     Out_Putc
+
+  ; write the horizontal line character for the full width of the terminal
+  moveq   #(80)-1, d1
+  moveq   #$71, d0
+
+.Loop:
+  bsr     Out_Putc
+  dbf     d1, .Loop
+
+  ; exit the alternate font mode
+  moveq   #$F, d0
+  bsr     Out_Putc
+
+  ; now, a newline
+  bra     crlf
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -432,72 +508,6 @@ OutHex:
   ; restore regs
   movem.l (sp)+, d1-d2/a0/a6
   rts
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; include any of our hardware glue
-        include "hw_glue.68k"
-
-; unused IRQ
-IRQ_Unused:
-  rte
-
-; unused trap
-Trap_Unused:
-  rte
-
-; unused exception handler
-Exception_Reserved:
-  rte
-
-; IRQ handler that forwards to RAM
-IRQ_Lvl2:
-  move.l  a0, -(sp)
-  lea     (Loader_IRQ2), a0
-  jsr     (a0)
-  move.l  (sp)+, a0
-  rte
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Rstrt - restart from control c
-;
-VUBUG_Restart:
-  ; restore all the registers we backed up earlier
-  ; movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
-
-  move    #$2700, sr
-
-  ; disable receivers
-  bsr     MC68681_DisableRx
-
-  ; wait for the break condition to be over on UART A
-.WaitBreak:
-  btst    #7, (MC68681_Base+MC68681_R_SRA)
-  bne     .WaitBreak
-
-  ; reset the 68681 receivers and clear rx buffers
-  moveq   #0, d0
-  move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
-  move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
-
-  ; enable channel a/b rx, channel a break
-  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
-  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
-
-  ; then, enable the receivers
-  bsr     MC68681_EnableRx
-
-
-  ; build a "fake" exception return frame
-  movem.l #$ffff,dr0              ;save registers d0-a7
-  move.l  usp,a0                  ;save user stack pointer
-  move.l  a0,ar7
-  move.w  (a7)+,_sr               ;save status register from stack
-  move.l  (a7)+,_pc               ;save program counter from stack
-  pea     comm                    ;fake a return to command loop
-  move.w  ssri,-(a7)              ;fake a new status register
-  rte
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -587,6 +597,77 @@ Echo_On:
 .MsgCursorOn:
   dc.b  $1b, "[?25h", nul
   even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include any of our hardware glue
+        include "hw_glue.68k"
+
+; unused IRQ
+IRQ_Unused:
+  rte
+
+; unused trap
+Trap_Unused:
+  rte
+
+; unused exception handler
+Exception_Reserved:
+  rte
+
+; IRQ handler that forwards to RAM
+IRQ_Lvl2:
+  move.l  a0, -(sp)
+  lea     (Loader_IRQ2), a0
+  jsr     (a0)
+  move.l  (sp)+, a0
+  rte
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Rstrt - restart from control c
+;
+VUBUG_Restart:
+  ; restore all the registers we backed up earlier
+  ; movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
+
+  move    #$2700, sr
+
+  ; restore the default interrupts
+  bsr     RAM_Vector_Init
+
+  ; disable receivers
+  bsr     MC68681_DisableRx
+
+  ; wait for the break condition to be over on UART A
+.WaitBreak:
+  btst    #7, (MC68681_Base+MC68681_R_SRA)
+  bne     .WaitBreak
+
+  ; reset the 68681 receivers and clear rx buffers
+  moveq   #0, d0
+  move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
+  move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
+
+  ; enable channel a/b rx, channel a break
+  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
+
+  ; then, enable the receivers
+  bsr     MC68681_EnableRx
+
+  ; print a divider
+  bsr     Out_Divider
+
+  ; build a "fake" exception return frame
+  movem.l #$ffff,dr0              ;save registers d0-a7
+  move.l  usp,a0                  ;save user stack pointer
+  move.l  a0,ar7
+  move.w  (a7)+,_sr               ;save status register from stack
+  move.l  (a7)+,_pc               ;save program counter from stack
+  pea     comm                    ;fake a return to command loop
+  move.w  ssri,-(a7)              ;fake a new status register
+  rte
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -798,7 +879,7 @@ Loader_Handle_Tick:
 
 sarea:  dcb.w   $80,$0000               ;system stack
 stack   =       *
-bktab:  dcb.w   $0a,$0000               ;breakpoint table
+bktab:  dcb.l   $0a,$0000               ;breakpoint table
 
 ; saved registers
 _sr:    dc.w    $0000
@@ -892,3 +973,74 @@ Load_ReceivedChecksum:
 ; our computed checksum
 Load_LocalChecksum:
   dc.l    0
+
+; do we run the program after loading it?
+Load_RunAfterLoad:
+  dc.b    0
+
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; RAM vectors
+RAM_Vectors_Start:
+
+RAM_Vector_Irq_Uninitialized:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq_Spurious:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq1:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq2: ; DUART
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq3:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq4:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq5:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq6:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq7: ; nmi
+  dc.l    0, 0, 0, 0
+
+RAM_Vector_Trap0:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap1:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap2:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap3:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap4:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap5:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap6:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap7:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap8:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap9:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapA:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapB:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapC:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapD:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapE:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapF:
+  dc.l    0, 0, 0, 0
+
+RAM_Vectors_End:
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; whether the exception was a bus or address error
+Exception_WasBus:
+  dc.b    0
+  even

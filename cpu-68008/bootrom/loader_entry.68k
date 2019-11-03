@@ -4,9 +4,9 @@
 ; Back up d1, a0 and restore when we leave the function. d0 is overwritten
 ; anyways by the status in routines.
 ;
-; Programs should invoke this with a jmp $7F80 or TRAP #1.
+; Programs should invoke this with a trap.
 ;
-  org     $7F80
+  ; org     $7F80
 
 Svc_Entry:
   ; back up a0

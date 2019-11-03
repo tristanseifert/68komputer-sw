@@ -56,7 +56,7 @@ MC68681_Reset:
 ; a set of 2-byte tuples in the format of register, value; terminated with a
 ; register number of $FF.
 MC68681_Reset_Data:
-  ; aux control: bit rate set 0, timer mode with CLK/16. no input change IRQ
+  ; aux control: bit rate set 1, timer mode with CLK/16. no input change IRQ
   dc.b    MC68681_W_ACR, %11110000
 
   ; configure timer with a value of 18432 ($4800), this gives us 100Hz
@@ -75,7 +75,8 @@ MC68681_Reset_Data:
   ; port A: set 9600 baud, set active mode, enable TX and RX
   dc.b    MC68681_W_CRA, %10010000 ; clear RX BRG bit (X = 0)
   dc.b    MC68681_W_CRA, %10110000 ; clear TX BRG bit (X = 0)
-  dc.b    MC68681_W_CSRA, %10111011
+  ; dc.b    MC68681_W_CSRA, %10111011 ; set 9600 baud
+  dc.b    MC68681_W_CSRA, %11001100 ; set 19.2k baud
   dc.b    MC68681_W_CRA, %11010000
   dc.b    MC68681_W_CRA, %00000101
 

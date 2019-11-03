@@ -511,11 +511,13 @@ Cmd_Go_NoAddr:
   ; bne     .NoMessage
 
   ; if not, print the "program" string
-  ; lea     .ProgramMsg, a0
-  ; bsr     writs
+  lea     Cmd_Go_Msg_Program, a0
+  bsr     writs
 
   ; print a newline
+  bsr     Out_Divider
   bsr     crlf
+  ; bsr     crlf
 
 .NoMessage:
 Cmd_Go_RunProgram:
@@ -533,8 +535,8 @@ Cmd_Go_RunProgram:
   rte
 
 
-; .ProgramMsg:
-  ; dc.w    csc
-  ; dc.b    "Program:"
-  ; dc.b    lf,lf,cr,nul
-  ; even
+Cmd_Go_Msg_Program:
+  dc.w    csc
+  dc.b    "Program:"
+  dc.b    lf,cr,nul
+  even
