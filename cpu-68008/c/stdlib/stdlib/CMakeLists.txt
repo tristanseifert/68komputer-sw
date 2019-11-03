@@ -21,7 +21,7 @@ qsort_r.c
 qsort.c
 rand.c
 realloc.c
-# strtol.c
+strtol.c
 # strtoll.c
 # strtoul.c
 # strtoull.c

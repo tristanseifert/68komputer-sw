@@ -211,6 +211,9 @@ Svc_WriteIO:
   ; back up registers
   move.l  d2, -(sp)
 
+  ; we only have 8 bits
+  and.l   #$00FF00FF, d1
+
   ; check that no pins are specified twice
   moveq   #0, d2
   move.w  d1, d2
@@ -318,17 +321,12 @@ Svc_Putc:
 ;   d0: Received character
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Svc_Getc:
-  lea     (MC68681_Base), a0
+  movem.l d1/a1, -(sp)
 
-.WaitForByte:
-	; is there a byte?
-	move.b  MC68681_R_SRA(a0), d0
-	btst    #0, d0
-	beq.s		.WaitForByte
+  lea     UART_A_Queue, a1
+  bsr     VUBUG_MC68681_Getch
 
-	; read the byte
-	move.b	MC68681_R_RHRA(a0), d0
-
+  movem.l (sp)+, d1/a1
   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

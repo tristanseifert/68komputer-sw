@@ -65,6 +65,8 @@ typedef struct __sFILE_fake FILE;
 
 /// Requires a definition of _putchar() for your platform
 int putchar(int c);
+int getchar();
+
 int puts(const char*);
 
 #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
@@ -86,10 +88,8 @@ int fsetpos(FILE*, const fpos_t*);
 size_t fread(void* __restrict, size_t, size_t, FILE* __restrict);
 size_t fwrite(const void* __restrict, size_t, size_t, FILE* __restrict);
 
-char* fgets(char* __restrict, int, FILE* __restrict);
-#if __STDC_VERSION__ < 201112L
-char* gets(char*);
-#endif
+// char* fgets(char* __restrict, int, FILE* __restrict);
+char* gets(char*, size_t);
 
 int fputc(int, FILE*);
 int putc(int, FILE*);
@@ -148,18 +148,18 @@ int vswscanf(const wchar_t* __restrict, const wchar_t* __restrict, __isoc_va_lis
 
 /// Unsupported printf variants
 
-void perror(const char*);
-
-int wprintf(const wchar_t* __restrict, ...);
-int fprintf(FILE* __restrict, const char* __restrict, ...);
-int vprintf(const char* __restrict, __isoc_va_list);
-int vfprintf(FILE* __restrict, const char* __restrict, __isoc_va_list);
-int vsprintf(char* __restrict, const char* __restrict, __isoc_va_list);
-int fwprintf(FILE* __restrict, const wchar_t* __restrict, ...);
-int swprintf(wchar_t* __restrict, size_t, const wchar_t* __restrict, ...);
-int vwprintf(const wchar_t* __restrict, __isoc_va_list);
-int vfwprintf(FILE* __restrict, const wchar_t* __restrict, __isoc_va_list);
-int vswprintf(wchar_t* __restrict, size_t, const wchar_t* __restrict, __isoc_va_list);
+// void perror(const char*);
+//
+// int wprintf(const wchar_t* __restrict, ...);
+// int fprintf(FILE* __restrict, const char* __restrict, ...);
+// int vprintf(const char* __restrict, __isoc_va_list);
+// int vfprintf(FILE* __restrict, const char* __restrict, __isoc_va_list);
+// int vsprintf(char* __restrict, const char* __restrict, __isoc_va_list);
+// int fwprintf(FILE* __restrict, const wchar_t* __restrict, ...);
+// int swprintf(wchar_t* __restrict, size_t, const wchar_t* __restrict, ...);
+// int vwprintf(const wchar_t* __restrict, __isoc_va_list);
+// int vfwprintf(FILE* __restrict, const wchar_t* __restrict, __isoc_va_list);
+// int vswprintf(wchar_t* __restrict, size_t, const wchar_t* __restrict, __isoc_va_list);
 #endif
 
 #ifdef __cplusplus

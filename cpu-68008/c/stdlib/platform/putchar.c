@@ -16,7 +16,7 @@ int putchar(int c) {
     "\ttrap #1\n"
     : /* no outputs */
     : "g"(v) /* input the character */
-    : "a0", "d0", "d1" /* clobber a0, d0-d1 */
+    : "d0", "d1" /* clobber a0, d0-d1 */
   );
 
   // always success

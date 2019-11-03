@@ -51,6 +51,9 @@
 /*! Expands to hex 0xffffffffU. Maximum value of unsigned int */
 #define UINT_MAX 0xffffffffU
 
+#define LONG_MAX 0x7fffffffU
+
+
 /*! Expands to  (-LONG_MAX - 1). Minimum value of signed long */
 #define LONG_MIN (-LONG_MAX - 1)
 

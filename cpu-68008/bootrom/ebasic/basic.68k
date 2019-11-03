@@ -90,7 +90,8 @@ VEC_OUT:
 
   move.l  d0, d1
 	moveq		#8, d0
-	jsr			Loader_API_Entry
+  trap    #1
+	; jsr			Loader_API_Entry
 
   ; clean up
   movem.l	(sp)+, d1/a0
@@ -107,7 +108,8 @@ VEC_IN:
   movem.l	d1/a0, -(sp)
 
 	moveq		#$A, d0
-	jsr			Loader_API_Entry
+  trap    #1
+	; jsr			Loader_API_Entry
 
   ; clean up
   movem.l	(sp)+, d1/a0
