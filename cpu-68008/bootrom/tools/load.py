@@ -7,6 +7,9 @@ import serial
 from termcolor import colored, cprint
 import sys
 import os
+################################################################################
+# block size
+kBlockSize = 256
 
 ################################################################################
 # waits for an acknowledge
@@ -31,26 +34,37 @@ if len(sys.argv) is not 5:
     print('usage: {exec} [binary path] [load address] [serial port] [baud rate]'.format(exec=sys.argv[0]))
     sys.exit(-1)
 
+# load the entire file into memory and pad it to multiples of 128 bytes
+data = open(sys.argv[1], "rb").read()
+data = bytearray(data)
+
+numPadRequired = (kBlockSize - (len(data) % kBlockSize))
+
+if numPadRequired is not 0 and numPadRequired is not kBlockSize:
+    for i in range(numPadRequired):
+        data.append(0)
+
+    cprint('• Added {added} bytes of padding to file'.format(added=numPadRequired), attrs=['bold'])
+    cprint('\tBlock size is {block}'.format(block=kBlockSize))
+
+
 # get some infos
 loadAddr = int(sys.argv[2], 0)
-size = os.path.getsize(sys.argv[1])
+size = len(data)
 
 # calculate the checksum over the file
 cprint('• Calculating file checksum', attrs=['bold'])
 
 checksum = 0
 
-with open(sys.argv[1], "rb") as f:
-    byte = f.read(1)
+for byte in data:
+    # just sum all bytes up
+    checksum += byte
 
-    while byte:
-        # just sum all bytes up
-        checksum += ord(byte)
-        # read the next byte
-        byte = f.read(1)
+cprint('\tChecksum: ${check:08x}'.format(check=checksum))
 
 # open and configure the serial port with timeout of 1sec
-port = serial.Serial(sys.argv[3], int(sys.argv[4]), timeout=1)
+port = serial.Serial(sys.argv[3], int(sys.argv[4]), timeout=0.5)
 
 # send the load address and wait for an ack
 cprint('• Sending load address: ${addr:08x}'.format(addr=loadAddr), attrs=['bold'])
@@ -67,22 +81,17 @@ cprint('• Sending file size: {size} bytes'.format(size=size), attrs=['bold'])
 port.write('{size:08x}'.format(size=size).encode('ascii'))
 waitForAck(port)
 
-# then, send each byte of the file
+# then, send each block of the file
 cprint('• Sending payload', attrs=['bold'])
+counter = 0
 
 with progressbar.ProgressBar(max_value=size) as bar:
-    with open(sys.argv[1], "rb") as f:
-        byte = f.read(1)
-        counter = 0
+    for blockOff in range(0, size, kBlockSize):
+        # get block of data, send it and wait for acknowledgement
+        block = data[blockOff:(blockOff+kBlockSize)]
+        port.write(bytes(block))
+        waitForAck(port)
 
-        while byte:
-            # send it and demand an ack
-            port.write('{data:02x}'.format(data=ord(byte)).encode('ascii'))
-            waitForAck(port)
-
-            # read the next byte
-            byte = f.read(1)
-
-            # update progress
-            counter += 1
-            bar.update(counter)
+        # update the progress bar
+        counter += kBlockSize
+        bar.update(counter)
