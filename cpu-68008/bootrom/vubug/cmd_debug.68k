@@ -521,6 +521,11 @@ Cmd_Go_NoAddr:
 
 .NoMessage:
 Cmd_Go_RunProgram:
+  ; wait for UART A tx to complete
+.waitTxRdy:
+  btst    #2, (MC68681_Base+MC68681_R_SRA)
+  beq     .waitTxRdy
+
   ; set up a stack frame to start the user program
   addq.w  #$4, a7                  ;pop the stack
   movem.l (dr0), #$7fff              ;get saved values d0-a6

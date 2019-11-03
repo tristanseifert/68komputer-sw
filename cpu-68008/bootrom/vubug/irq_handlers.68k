@@ -1,6 +1,58 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; IRQ and trap handlers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Installs the default set of vectors.
+RAM_Vector_Init:
+  ; disable interrupts now
+  move    sr, -(sp)
+  move    #$2700, sr
+
+  ; first, reset each vector to rte
+  lea     RAM_Vector_Irq_Uninitialized, a0
+  moveq   #((RAM_Vectors_End-RAM_Vectors_Start)/16)-1, d0
+
+  move.l  #$4E734E71, d1 ; rte/nop
+  move.l  #$4E714E71, d2 ; nop/nop
+
+.ClearLoop:
+  move.l  d1, (a0)+
+  move.l  d2, (a0)+
+  move.l  d2, (a0)+
+  move.l  d2, (a0)
+  dbf     d0, .ClearLoop
+
+  ; install our 68681 vector
+  lea     RAM_Vector_Irq2, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #VUBUG_MC68681_ISR, (a0)+
+
+  ; install the trap 0 (exit) handler
+  lea     RAM_Vector_Trap0, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #Svc_Exit_Trap, (a0)
+
+  ; install the trap 1 (loader services) handler
+  lea     RAM_Vector_Trap1, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #Svc_Entry_Trap, (a0)
+
+  ; we've finished, re-enable interrupts
+  move    (sp)+, sr
+  rts
+
+.Jmp:
+  jmp     $12345678
+.Jsr:
+  jsr     $12345678
+.Nop:
+  nop
+
+; reserved exception handler, should never actually get called
+.Rte:
+Exception_Reserved:
+  rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Generic trap handler
 ;
@@ -36,7 +88,7 @@ Trap_WriteMsgWithPc:
 
 Trap_WriteMsgWithPc_MsgTrap:
   dc.b    lf,cr
-  dc.b    "Trap at ", nul
+  dc.b    "Trap at $", nul
   even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,11 +97,11 @@ Trap_WriteMsgWithPc_MsgTrap:
 ;
 bhmes:
   dc.b    lf,cr
-  dc.b    "Breakpoint at ", nul
+  dc.b    "Breakpoint at $", nul
 
 binin:
   dc.b    lf,cr
-  dc.b    "Bad Instruction at ", nul
+  dc.b    "Bad instruction at $", nul
   even
 
 bhlr:
@@ -109,8 +161,9 @@ bhlr:
 ; Trace handler
 ;
 tlocm:  dc.b    lf,cr
-        dc.b    "PC == ", nul
+        dc.b    "PC == $", nul
         dc.b    nul
+        even
 
 Exception_Trace:
 thlr:   move.w  ssrn,sr                 ;disable interrupts
@@ -222,7 +275,6 @@ Exception_BusAddr_Handle:
 .MsgAddr:
   dc.b    lf, cr, $7
   dc.b    "Address error at $", nul
-  even
 
 .MsgBus:
   dc.b    lf, cr, $7
