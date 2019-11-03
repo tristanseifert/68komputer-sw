@@ -15,7 +15,7 @@ dd if=ebasic/ebasic.bin of=ebasic/ebasic_trimmed.bin skip=983040 bs=1 conv=notru
 
 # build the apps directory
 echo "\n\nCompressing apps"
-lz4 -1 -f --no-frame-crc ebasic/ebasic_trimmed.bin apps/ebasic.bin.lz4
+lz4 -9 -f --no-frame-crc ebasic/ebasic_trimmed.bin apps/ebasic.bin.lz4
 
 echo "\n\nAssembling apps directory"
 vasmm68k_mot -Fbin -m68008 -esc -spaces -o apps/directory.bin -L apps/directory.lst apps/directory.68k

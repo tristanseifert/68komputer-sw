@@ -10,7 +10,7 @@
 ; - 4-byte load base address (in HEX form)
 ; - 4-byte checksum over data
 ; - 4-byte length value
-; - Data bytes
+; - Data bytes (sent as raw bytes, in blocks of 256 bytes)
 ;
 ; Between each of those chunks, we acknowledge by sending a single dot.
 ;
@@ -44,6 +44,18 @@ Cmd_Load:
   ; this clears the UART B receive buffer
   move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
 
+  ; disable UART B receive irq, set 19.2kbaud
+  lea     (MC68681_Base), a5
+
+  move.b  #%00000110, MC68681_W_IMR(a5) ; IRQs: break_A, RXRDY_A
+  move.b  #%00000010, MC68681_W_CRB(a5) ; disable the receivers
+  ; move.b  #%11001100, MC68681_W_CSRB(a5) ; set 38.4k baud
+  ; move.b  #%01110111, MC68681_W_CSRB(a5) ; set 57.6k baud
+  move.b  #%10001000, MC68681_W_CSRB(a5) ; set 115.2k baud
+  move.b  #%00100000, MC68681_W_CRB(a5) ; reset receiver
+  move.b  #%00000001, MC68681_W_CRB(a5) ; enable receiver
+
+
   ; disable echo
   bsr     Echo_Off
 
@@ -51,15 +63,15 @@ Cmd_Load:
   lea     .MsgLoadStart, a0
   bsr     writs
 
-  move.b  #$0d, d0
-  bsr     writu
+  ; move.b  #$0d, d0
+  ; bsr     writu
 
   ; we're going to use the host port load routine
-  lea     lgch, a0
+  lea     Load_UartRx, a0
 
 .ReadAddress:
   ; try to read the load address
-  lea     lgch, a0
+  lea     Load_UartRx, a0
   bsr     InHex_Long
   move.l  d0, (Load_BaseAddr)
 
@@ -70,11 +82,11 @@ Cmd_Load:
 
   ; acknowledge
   moveq   #'.', d0
-  bsr     writu
+  bsr     Load_UartTx
 
 .ReadChecksum:
   ; try to read the load checksum
-  lea     lgch, a0
+  lea     Load_UartRx, a0
   bsr     InHex_Long
   move.l  d0, (Load_ReceivedChecksum)
 
@@ -85,11 +97,11 @@ Cmd_Load:
 
   ; acknowledge
   moveq   #'.', d0
-  bsr     writu
+  bsr     Load_UartTx
 
 .ReadLength:
   ; then, try to read the total number of bytes
-  lea     lgch, a0
+  lea     Load_UartRx, a0
   bsr     InHex_Long
   move.l  d0, (Load_TotalLength)
 
@@ -104,31 +116,41 @@ Cmd_Load:
   ; move.l  (Load_TotalLength), d0
   ; bsr     OutHex_Long
 
-  ; acknowledge
-  moveq   #'.', d0
-  bsr     writu
-
 .PrepareForRead:
   ; prepare a "checksum" reg and a temp reg
   moveq   #0, d6
   moveq   #0, d5
 
-  ; read in a byte at a time
+  ; calculate the number of 128 byte blocks
   move.l  (Load_TotalLength), d7
+  lsr.l   #8, d7
   subq.l  #1, d7
 
   move.l  (Load_BaseAddr), a1
 
-  lea     lgch, a0
-  move.l  a0, a2
+  ; block size
+  move.l  #255, d4
+
+  ; acknowledge
+  moveq   #'.', d0
+  bsr     Load_UartTx
+
+  lea     Load_UartRx, a0
+  ; move.l  a0, a2
 
 .ReceiveLoop:
   ; receive the byte…
-  bsr     InHex_Byte
-  move.b  d0, (a1)+
+  ; bsr     InHex_Byte
+  moveq   #0, d0
 
-  move.b  d0, d5
-  add.l   d5, d6
+  ; rept 256
+  move.l  d4, d5
+.ByteLoop:
+  jsr     (a0)
+  move.b  d0, (a1)+
+  add.l   d0, d6
+  dbf     d5, .ByteLoop
+  ; endr
 
   ; ; update remaining bytes counter
   ; lea     .MsgBackspace8, a0
@@ -136,11 +158,11 @@ Cmd_Load:
   ; move.l  d7, d0
   ; bsr     OutHex_Long
 
-  move.l  a2, a0
+  ; move.l  a2, a0
 
   ; …then acknowledge it
   moveq   #'.', d0
-  bsr     writu
+  bsr     Load_UartTx
 
   dbf     d7, .ReceiveLoop
 
@@ -197,6 +219,13 @@ Cmd_Load:
   bsr     writs
 
 .Exit:
+  ; restore UART B settings
+  move.b  #%00000010, MC68681_W_CRB(a5) ; disable the receivers
+  move.b  #%01010101, MC68681_W_CSRB(a5) ; set 14.4k baud
+  move.b  #%00100000, MC68681_W_CRB(a5) ; reset receiver
+  move.b  #%00000001, MC68681_W_CRB(a5) ; enable receiver
+  move.b  #%00100110, MC68681_W_IMR(a5) ; RXRDY_B, break_A, RXRDY_A
+
   ; clear receive buffers
   move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
   move.b  #0, (UART_B_Queue+UART_Queue_WritePtr)
@@ -208,19 +237,19 @@ Cmd_Load:
 
 .MsgLoadStart:
   dc.b    lf,cr
-  dc.b    "Waiting for load...", nul
+  dc.b    "Waiting for load (115,200 baud 8N1)...", nul
 
 .MsgLoadAddr:
   dc.b    lf,cr
-  dc.b    "Load address:  $", nul
+  dc.b    "Load Address:  $", nul
 
 .MsgLoadCheck:
   dc.b    lf, cr
-  dc.b    "Load checksum: $", nul
+  dc.b    "Load Checksum: $", nul
 
 .MsgLoadLen:
   dc.b    lf, cr
-  dc.b    "Load size:     $", nul
+  dc.b    "Load Size:     $", nul
 
 .MsgLoadRemaining:
   dc.b    lf, cr
@@ -246,3 +275,29 @@ Cmd_Load:
   dc.b    lf,cr
   dc.b    "Load done!", nul
   even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Optimized routine to read from UART B quickly, to be used by the loading
+; code. This assumes we've got interrupts for it turned off.
+;
+; We assume that a5 contains the base of the 68681.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Load_UartRx:
+.WaitRxRdy:
+  ; check RXRDY bit
+  btst  #0, MC68681_R_SRB(a5)
+  beq   .WaitRxRdy
+
+  ; read the character from the DUART
+  move.b  MC68681_R_RHRB(a5), d0
+  rts
+
+Load_UartTx:
+.waitTxRdy:
+  ; wait for TXRDY
+  btst    #2, MC68681_R_SRB(a5)
+  beq     .waitTxRdy
+
+  ; write character to DUART
+  move.b  d0, MC68681_W_THRB(a5)
+  rts
