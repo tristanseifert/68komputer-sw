@@ -1,0 +1,32 @@
+################################################################################
+# compile all string files into the string object
+################################################################################
+add_library(string OBJECT
+memchr.c
+memcmp.c
+memcpy.c
+memmem.c
+memmove.c
+memrchr.c
+memset.c
+strcat.c
+strchr.c
+strchrnul.c
+strcmp.c
+strcoll.c
+strcpy.c
+strcspn.c
+strdup.c
+strlen.c
+strncat.c
+strncmp.c
+strncpy.c
+strndup.c
+strnlen.c
+strnstr.c
+strpbrk.c
+strrchr.c
+strspn.c
+strstr.c
+strtok.c
+strxfrm.c)

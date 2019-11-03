@@ -291,6 +291,9 @@ Cmd_MemDump:
   adda.l  #$40, a2
 
 .StartDump:
+  ; disable echo
+  bsr     Echo_Off
+
   ; display the header
   bsr     crlf
   lea     .MsgHeader, a0
@@ -375,6 +378,9 @@ Cmd_MemDump:
 
   ; we're done, update our examination pointer
   move.l  a1, (exam)
+
+  ; also, re-enable echo
+  bsr     Echo_On
   rts
 
 

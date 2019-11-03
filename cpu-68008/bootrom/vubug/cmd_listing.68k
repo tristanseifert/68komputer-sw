@@ -849,6 +849,7 @@ contab: dc.b    "t "
         dc.b    "lt"
         dc.b    "gt"
         dc.b    "le"
+        even
 
 addq:   move.w  d1,d0
         andi.w  #$0100,d0       ;addq/subq
@@ -1389,6 +1390,7 @@ mUNLK:  dc.b    "unlk", nul
 mccr:   dc.b    "ccr", nul
 msr:    dc.b    "sr", nul
 musp:   dc.b    "usp", nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 spc:    move.b  #$20,d0         ;load a spc
@@ -1456,8 +1458,10 @@ wdreg:  swap    d0              ;save the reg number in upper 16 bits
         bsr     writ            ;write it
         rts
 
-mPC:    dc.b    "pc"
-mIAM:   dc.b    "ILLEGAL ADDRESS MODE"
+mPC:    dc.b    "pc", nul
+mIAM:   dc.b    "ILLEGAL ADDRESS MODE", nul
+  even
+
 writea: move.b  d0,writm        ;save the important part of the opcode
         andi.b  #$38,d0         ;mask off all but the mode bits
         bne     mode1           ;if zero, it's data reg direct

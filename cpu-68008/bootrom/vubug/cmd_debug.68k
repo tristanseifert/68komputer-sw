@@ -514,6 +514,9 @@ Cmd_Go_NoAddr:
   ; lea     .ProgramMsg, a0
   ; bsr     writs
 
+  ; print a newline
+  bsr     crlf
+
 .NoMessage:
 Cmd_Go_RunProgram:
   ; set up a stack frame to start the user program

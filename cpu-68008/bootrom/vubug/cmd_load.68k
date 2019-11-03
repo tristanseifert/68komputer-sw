@@ -99,10 +99,10 @@ Cmd_Load:
   bsr     OutHex_Long
 
   ; Print the "Remaining bytes" message
-  lea     .MsgLoadRemaining, a0
-  bsr     writs
-  move.l  (Load_TotalLength), d0
-  bsr     OutHex_Long
+  ; lea     .MsgLoadRemaining, a0
+  ; bsr     writs
+  ; move.l  (Load_TotalLength), d0
+  ; bsr     OutHex_Long
 
   ; acknowledge
   moveq   #'.', d0
@@ -130,11 +130,11 @@ Cmd_Load:
   move.b  d0, d5
   add.l   d5, d6
 
-  ; update remaining bytes counter
-  lea     .MsgBackspace8, a0
-  bsr     writs
-  move.l  d7, d0
-  bsr     OutHex_Long
+  ; ; update remaining bytes counter
+  ; lea     .MsgBackspace8, a0
+  ; bsr     writs
+  ; move.l  d7, d0
+  ; bsr     OutHex_Long
 
   move.l  a2, a0
 
@@ -216,7 +216,7 @@ Cmd_Load:
 
 .MsgLoadCheck:
   dc.b    lf, cr
-  dc.b    "Load Checksum: $", nul
+  dc.b    "Load checksum: $", nul
 
 .MsgLoadLen:
   dc.b    lf, cr

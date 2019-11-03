@@ -1,3 +1,6 @@
 [submodule "cpu-68008/bootrom/lz4-68k"]
 	path = cpu-68008/bootrom/lz4-68k
 	url = https://github.com/arnaud-carre/lz4-68k.git
+[submodule "cpu-68008/c/stdlib/printf"]
+	path = cpu-68008/c/stdlib/printf
+	url = https://github.com/mpaland/printf.git

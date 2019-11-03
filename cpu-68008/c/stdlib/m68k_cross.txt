@@ -1,0 +1,28 @@
+# Meson Cross-compilation File for GCC ARM Builds
+# Requires that arm-none-eabi-* is found in your PATH
+# For more information: http://mesonbuild.com/Cross-compilation.html
+
+[binaries]
+c = 'm68k-elf-gcc'
+cpp = 'm68k-elf-c++'
+ar = 'm68k-elf-ar'
+strip = 'm68k-elf-strip'
+ld = 'm68k-elf-ld'
+# Not Used:
+#	pkgconfig
+#	exe_wrapper
+
+[properties]
+c_args = [ '-mcpu=68000', '-march=68000', '-nostartfiles', '-nodefaultlibs', '-nolibc', '-nostdlib' ]
+c_link_args = []
+cpp_args = [ '-mcpu=68000', '-march=68000', '-nostartfiles', '-nodefaultlibs', '-nolibc', '-nostdlib' ]
+cpp_link_args = []
+
+# Keep this set, or the sanity check won't pass
+needs_exe_wrapper = true
+
+[host_machine]
+system = 'none'
+cpu_family = 'm68k'
+cpu = '68000'
+endian = 'big'
