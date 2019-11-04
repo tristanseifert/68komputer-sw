@@ -86,8 +86,15 @@ SECTIONS {
     /* allocate some stack */
     . = ALIGN(0x10);
     __stack_top = .;
-    . += 0x800;
+    . += 0x400;
     __stack = .;
+
+    /* reserve the rest of the space for heap */
+    . = ALIGN(0x10);
+    __heap_start = .;
+    /* . += (500K - .); */
+    . += 256K;
+    __heap_end = .;
   } > ram
 
   /* string tables */

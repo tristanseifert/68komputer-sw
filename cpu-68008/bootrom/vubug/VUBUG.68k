@@ -491,12 +491,12 @@ Lib_LZ4:
 ; from lz4-68k/lz4_frame.asm
 lz4_frame_depack:
 	cmpi.l	#$04224d18,(a0)+	; LZ4 frame MagicNb
-	bne.s	.Error
+	bne  	.Error
 
 	move.b	(a0),d0
 	andi.b	#%11001001,d0		; check version, no depacked size, and no DictID
 	cmpi.b	#%01000000,d0
-	bne.s	.Error
+	bne  	.Error
 
 	; read 32bits block size without movep (little endian)
 	move.b	6(a0),d0
@@ -508,7 +508,7 @@ lz4_frame_depack:
 	move.b	3(a0),d0
 	lea		7(a0),a0			; skip LZ4 block header + packed data size
 
-	bra.s	lz4_depack
+	bra  	lz4_depack
 
 .Error:
   illegal

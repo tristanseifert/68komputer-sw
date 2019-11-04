@@ -26,5 +26,11 @@ add_library(c-68komputer SHARED STATIC ${SOURCE_FILES})
 add_library(printf OBJECT printf/printf.h printf/printf.c)
 add_definitions(-DPRINTF_DISABLE_SUPPORT_FLOAT -DPRINTF_DISABLE_SUPPORT_EXPONENTIAL -DPRINTF_DISABLE_SUPPORT_LONG_LONG -DPRINTF_DISABLE_SUPPORT_PTRDIFF_T)
 
+# add tinyalloc sources
+target_sources(c-68komputer PUBLIC
+  tinyalloc/tinyalloc.c
+  tinyalloc/tinyalloc.h
+)
+
 # and link against it the sub libraries
 target_link_libraries(c-68komputer stdlib ctype string printf platform math io)

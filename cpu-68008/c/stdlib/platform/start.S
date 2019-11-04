@@ -2,6 +2,9 @@
 
   .extern main
   .extern __stack
+
+  .extern __c_init
+  .extern __c_fini
   # .extern __bss_start
   # .extern __text_start
 
@@ -16,14 +19,20 @@ _start:
 
   /* prepare stack and frame pointer. */
   move.l  #__stack, %sp
-  # link    a6, #-8
+
+  /* call the runtime initializer */
+  jsr     __c_init
 
   /* call main(int argc, char *argv[]) */
-  # move.l  #0, -(sp)
-  # move.l  #0, -(sp)
-  # move.l  #0, -(sp)
+  link    %a6, #-12
+  move.l  #0, -(%sp)
+  move.l  #0, -(%sp)
+  move.l  #0, -(%sp)
   jsr     main
-  # lea     (sp, 12), sp
+  unlk    %a6
+
+  /* call the runtime teardown */
+  jsr     __c_fini
 
   /* return to monitor */
   trap    #0

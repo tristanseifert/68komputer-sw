@@ -35,6 +35,8 @@ Svc_Table:
   dc.w    Svc_InHex-Svc_Table
   ; 0E: Set tty attributes
   dc.w    Svc_TtySetAttribs-Svc_Table
+  ; 0F: Unpack with LZ4
+  dc.w    Svc_Unpack_Lz4-Svc_Table
 Svc_Table_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -492,5 +494,30 @@ Svc_TtySetAttribs:
   bsr     Echo_Off
 
 .Done:
+  moveq   #0, d0
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0F - Decompresses data using LZ4 algorithm.
+;
+; INPUTS:
+;   a1: Compressed data
+;   a2: Output uncompressed data here. This must be big enough to fit all data
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Unpack_Lz4:
+  ; save the registers clobbered by LZ4
+  movem.l d0-d3/d5/d7/a0-a4, -(sp)
+
+  ; copy the input to a0 and output to a1, then decompress
+  move.l  a1, a0
+  move.l  a2, a1
+  bsr     Lib_LZ4
+
+  ; restore registers
+  movem.l (sp)+, d0-d3/d5/d7/a0-a4
+
+  ; the status is always success
   moveq   #0, d0
   rts
