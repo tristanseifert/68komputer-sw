@@ -177,8 +177,10 @@ Svc_Delay:
 
   ; wait until the values are identical
 .wait:
+  stop    #$2000 ; wait for an irq
+
   cmp.l   (a0), d0
-  beq     .wait
+  bne     .wait
 
   rts
 

@@ -56,12 +56,12 @@ MC68681_Reset:
 ; a set of 2-byte tuples in the format of register, value; terminated with a
 ; register number of $FF.
 MC68681_Reset_Data:
-  ; aux control: bit rate set 1, timer mode with CLK/16. no input change IRQ
-  dc.b    MC68681_W_ACR, %11110000
+  ; aux control: bit rate set 1, timer mode with CLK/1. no input change IRQ
+  dc.b    MC68681_W_ACR, %11100000
 
   ; configure timer with a value of 18432 ($4800), this gives us 100Hz
+  dc.b    MC68681_W_CTU, $48
   dc.b    MC68681_W_CTL, $00
-  dc.b    MC68681_W_CTL, $48
 
   ; port A: reset receiver, transmitter, error status, break change interrupt
   dc.b    MC68681_W_CRA, %00100000
