@@ -16,4 +16,6 @@ mc68681_gpio.c
 mc68681_gpio.h
 unpack.c
 unpack.h
+clock.c
+clock.h
 )

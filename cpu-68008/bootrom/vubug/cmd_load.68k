@@ -228,7 +228,7 @@ Cmd_Load:
   move.b  #%01010101, MC68681_W_CSRB(a5) ; set 14.4k baud
   move.b  #%00100000, MC68681_W_CRB(a5) ; reset receiver
   move.b  #%00000001, MC68681_W_CRB(a5) ; enable receiver
-  move.b  #%00100110, MC68681_W_IMR(a5) ; RXRDY_B, break_A, RXRDY_A
+  move.b  #%00101110, MC68681_W_IMR(a5) ; RXRDY_B, break_A, timer, RXRDY_A
 
   ; clear receive buffers
   move.b  #0, (UART_A_Queue+UART_Queue_WritePtr)
@@ -290,7 +290,7 @@ Cmd_Load:
 .MsgChecksumFailed:
   dc.b    lf, lf, cr
   dc.b    $7
-  dc.b    "Checksum verification failed!", nul
+  dc.b    $1b, "[7m", "Checksum verification failed!", $1b, "[0m", nul
 
 .MsgUserPC:
   dc.b    lf, cr

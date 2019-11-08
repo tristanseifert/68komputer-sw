@@ -11,10 +11,11 @@ add_executable(hello-world
 )
 
 target_include_directories(hello-world PUBLIC ../stdlib/include)
+target_include_directories(hello-world PUBLIC ../stdlib)
 target_link_libraries(hello-world c-68komputer)
 
-# optimize for size
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os")
+# optimize for speed
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Ofast")
 
 # ensure we use the 68komputer linker script
 set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -T ${CMAKE_CURRENT_SOURCE_DIR}/../stdlib/platform/68komputer.ld" )

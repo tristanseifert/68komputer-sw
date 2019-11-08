@@ -8,10 +8,10 @@
 ;
 Out_Putc:
 writ:
-  btst    #0, ctrls               ; Is ctrl-s active
+  btst    #0, (ctrls)             ; Is ctrl-s active
   beq     .doWrite                ; no, so write character
 
-  stop    #$2000                  ; yes; wait until next int
+  stop    #$2000                  ; yes, wait until next int
   bra     writ                    ; when awakened check again
 
 .doWrite:

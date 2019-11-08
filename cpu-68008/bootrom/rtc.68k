@@ -18,6 +18,7 @@ RTC_Reset:
   move.l  d0, (a0)+
   endr
 
+RTC_Magic_Reset:
   ; read from the RTC at least 64 times to reset its internal state
   lea     (RTC_Time_Reg), a0
   moveq   #64, d0
@@ -36,7 +37,8 @@ RTC_Reset:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTC_Read:
   ; write magic sequence
-  bsr.w   RTC_WriteMagic
+  bsr     RTC_Magic_Reset
+  bsr     RTC_WriteMagic
 
   ; read 64 bits from clock
   lea     (RTC_Time_Reg), a0
@@ -112,10 +114,11 @@ RTC_Read:
 ;   d0-d3, a0-a1
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTC_Write:
-  ; TODO: update RAM buffer
+  ; update RAM buffer
   bsr     RTC_UpdateBuffer
 
   ; write magic sequence
+  bsr     RTC_Magic_Reset
   bsr     RTC_WriteMagic
 
   ; write 64 bits from buffer
@@ -176,12 +179,12 @@ RTC_UpdateBuffer:
 
   ; write the day of month
   move.b  (Loader_DateDay), d0
-  and.b   #$3f, d0
+  and.b   #$3F, d0
   move.b  d0, (a0)+
 
   ; write the month
   move.b  (Loader_DateMonth), d0
-  and.b   #$1f, d0
+  and.b   #$1F, d0
   move.b  d0, (a0)+
 
   ; write the year
@@ -198,7 +201,7 @@ RTC_UpdateBuffer:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTC_WriteMagic:
   lea     (RTC_Time_Reg), a0
-  lea     RTC_MagicSeq(pc), a1
+  lea     RTC_MagicSeq, a1
 
   moveq   #0, d1
   moveq   #63, d0

@@ -157,59 +157,6 @@ rrts:   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Proto - Prototype command in ram
-;
-;******************************************
-;*                                        *
-;* Prototype commands are invoked:        *
-;*                                        *
-;*      px xxxxxxxx - load address xxxxxxxx for   *
-;*                prototype command x.    *
-;*      px<cr> - execute prototype com-   *
-;*               mand x.                  *
-;*                                        *
-;*      NOTE: x must be a 1, 2, or 3      *
-;*                                        *
-;******************************************
-;
-pmess:
-  dc.b    lf,cr
-    dc.b    "Prototype ", nul
-pm1:
-  dc.b    "running:"
-  dc.b    lf,cr,nul
-pm2:
-  dc.b    "installed"
-  dc.b    cr,nul,nul
-
-proto:  bsr     getch                   ;get prototype number
-        move.l  d0,d1                   ;save number
-        andi.b  #$0f,d1                 ;strip leading hex digit
-        subq.b  #$1,d1                  ;normalize to 0
-        lsl.l   #$1,d1                  ;multiply by 2
-        lea     ptab,a1                 ;set starting address
-        adda.l  d1,a1                   ;add offset
-        bsr     getch                   ;get delimiter
-        cmp.b   #$0d,d0                 ;if <cr> then do command
-        beq     prun
-        lea     getch,a0                ;else install in table
-        bsr     InHex_Long                    ;get address
-        move.w  d0,(a1)                 ;move in address
-        lea     pmess,a0
-        bsr     writs
-        lea     pm2,a0
-        bsr     writs
-        bra     prts
-prun:   movea.w (a1),a1                 ;run prototype command
-        lea     pmess,a0
-        bsr     writs
-        lea     pm1,a0
-        bsr     writs
-        jsr     (a1)                    ;go do it
-prts:   rts
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
 ; Bkpt - Set/Remove breakpoints
 ;
 ;

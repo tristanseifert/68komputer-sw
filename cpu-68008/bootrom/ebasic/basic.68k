@@ -163,7 +163,7 @@ VEC_IN:
 ;
 ; LOAD routine  (not implemented)
 
-VEC_LD
+VEC_LD:
 	MOVEQ		#$2E,d7			        ; error code $2E "Not implemented" error
 	BRA		LAB_XERR			; do error #d7, then warm start
 
@@ -171,7 +171,7 @@ VEC_LD
 ;
 ; SAVE routine (not implemented)
 
-VEC_SV
+VEC_SV:
 	MOVEQ		#$2E,d7			        ; error code $2E "Not implemented" error
 	BRA		LAB_XERR			; do error #d7, then warm start
 

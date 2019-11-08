@@ -255,18 +255,32 @@ Svc_WriteIO:
 ; 06 - Reads the RTC and updates the in memory date/time variables.
 ;
 ; INPUTS:
-;   None
+;   a1: Location to a time struct that is filled in if provided.
 ; OUTPUTS:
 ;   None
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Svc_ReadRtc:
   ; back up registers
-  movem.l d0/d2-d3/a1, -(sp)
+  movem.l d0-d3, -(sp)
 
+  move.l  a1, -(sp)
   bsr.w   RTC_Read
+  move.l  (sp)+, a1
 
+  ; copy the struct if provided
+  move.l  a1, d0
+  tst.l   d0
+  beq     .NoStruct
+
+  ; copy 8 bytes
+  lea     Loader_DateTimeBase, a0
+
+  move.l  (a0)+, (a1)+
+  move.l  (a0), (a1)
+
+.NoStruct:
   ; restore registers
-  movem.l (sp)+, d0/d2-d3/a1
+  movem.l (sp)+, d0-d3
   moveq   #0, d0
 
   rts
@@ -275,18 +289,30 @@ Svc_ReadRtc:
 ; 07 - Writes to the RTC the values in the memory date/time variables.
 ;
 ; INPUTS:
-;   None
+;   a1: Location of a time struct that is used to set the clock, 0 otherwise
 ; OUTPUTS:
 ;   None
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Svc_WriteRtc:
   ; back up registers
-  movem.l d0/d2-d3/a1, -(sp)
+  movem.l d0-d3/a1, -(sp)
 
+  ; do we have an input time struct?
+  move.l  a1, d0
+  tst.l   d0
+  beq     .NoStruct
+
+  ; copy 8 bytes of struct
+  lea     Loader_DateTimeBase, a0
+
+  move.l  (a1)+, (a0)+
+  move.l  (a1), (a0)
+
+.NoStruct:
   bsr.w   RTC_Write
 
   ; restore registers
-  movem.l (sp)+, d0/d2-d3/a1
+  movem.l (sp)+, d0-d3/a1
   moveq   #0, d0
 
   rts
@@ -302,16 +328,19 @@ Svc_WriteRtc:
 ;   None
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Svc_Putc:
-  ; write character to DUART
-  move.b  d1, (MC68681_Base+MC68681_W_THRA)
+  move.b  d1, d0
+  bra     Out_Putc
 
-  ; then, wait for tx to complete
-.wait:
-  ; read the status register, check TXRDY bit (2), loop while clear
-  move.b  (MC68681_Base+MC68681_R_SRA), d0
-  btst    #2, d0
-  beq     .wait
-  rts
+;   ; write character to DUART
+;   move.b  d1, (MC68681_Base+MC68681_W_THRA)
+;
+;   ; then, wait for tx to complete
+; .wait:
+;   ; read the status register, check TXRDY bit (2), loop while clear
+;   move.b  (MC68681_Base+MC68681_R_SRA), d0
+;   btst    #2, d0
+;   beq     .wait
+;   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 09 - Reads a single character from the active TTY.

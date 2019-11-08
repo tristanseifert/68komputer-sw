@@ -74,7 +74,8 @@ ghpr:
 
 Trap_WriteMsgWithPc:
   ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
-  move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  ; move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.b  #%00101110, (MC68681_Base+MC68681_W_IMR) ; also adds timer ready
   move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
   bsr     writs

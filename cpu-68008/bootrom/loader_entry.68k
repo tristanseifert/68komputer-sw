@@ -16,13 +16,13 @@ Svc_Entry:
   add.w   d0, d0
 
   ; check that the request is in bounds
-  move.l  d1, -(sp)
+  move.w  d1, -(sp)
 
-  moveq   #(Svc_Table_End-Svc_Table), d1
+  move.w  #(Svc_Table_End-Svc_Table), d1
   cmp.w   d1, d0
   bge     .Invalid
 
-  move.l  (sp)+, d1
+  move.w  (sp)+, d1
 
   ; get offset into table and jump
   lea     Svc_Table, a0

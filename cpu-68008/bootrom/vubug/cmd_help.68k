@@ -113,7 +113,7 @@ Cmd_Help:
 
 
 .MsgNoSuchTopic:
-  dc.b    cr, lf
+  dc.b    cr, lf, $7
   dc.b    "No such help topic was found. The following commands are supported:"
   dc.b    cr, lf, nul
   even
@@ -141,8 +141,6 @@ HelpTable:
   dc.w    HelpText_MsgHeader_Copy, HelpText_MsgText_Copy
   dc.w    $5200           ;r - register modify
   dc.w    HelpText_MsgHeader_Register, HelpText_MsgText_Register
-  dc.w    $5000           ;p - prototype commands
-  dc.w    HelpText_MsgHeader_Prototype, HelpText_MsgText_Prototype
   dc.w    $4100           ;a - assembly listing
   dc.w    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
   dc.w    $4900           ;b - basic interpreter
@@ -222,20 +220,6 @@ HelpText_MsgDetail_Load:
   Help_Text_Command "l<cr>", "Load from host with no offset"
   Help_Text_Command "l xxxxxxxx", "Load from host with offset xxxxxxxx"
   dc.b    nul
-
-
-; prototype command
-HelpText_MsgHeader_Prototype:
-  Help_Text_Header "P", "Prototype commands in RAM"
-  dc.b    nul
-
-HelpText_MsgText_Prototype:
-  Help_Text_Description "Invoke prototype as follows:"
-  Help_Text_Command "px yyyyyyyy", "Load address yyyyyyyy for prototype command x."
-  Help_Text_Command "px<cr>", "Execute prototype command x."
-  Help_Text_Description "\r\n    x must be in [1,3]."
-
-  dc.b  nul
 
 
 ; breakpoint command
