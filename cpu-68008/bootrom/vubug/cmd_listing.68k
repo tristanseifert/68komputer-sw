@@ -1346,7 +1346,7 @@ mEORI:  dc.b    "eori", nul
 mEORIcr:dc.b    "eoriccr", nul
 mEXG:   dc.b    "exg", nul
 mEXT:   dc.b    "ext", nul
-mILLEG: dc.b    "ILLEGAL", nul
+mILLEG: dc.b    $1b, "[5m", "ILLEGAL", $1b, "[0m", nul
 mJMP:   dc.b    "jmp", nul
 mJSR:   dc.b    "jsr", nul
 mLEA:   dc.b    "lea", nul

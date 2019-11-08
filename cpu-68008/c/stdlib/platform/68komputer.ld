@@ -16,6 +16,7 @@ SECTIONS {
   .text : {
     /* startup code */
     *(.startup .startup.*)
+    *(.text.startup)
 
     /* regular ass code */
     *(.text .text.*)
@@ -80,8 +81,10 @@ SECTIONS {
     *(.shbss)
     *(.bss .bss.*)
     *(COMMON)
-    _end =  ALIGN (0x8);
-    __end = _end;
+
+    . = ALIGN(0x10);
+    __bss_end = .;
+    __end = .;
 
     /* allocate some stack */
     . = ALIGN(0x10);
@@ -94,7 +97,11 @@ SECTIONS {
     __heap_start = .;
     /* . += (500K - .); */
     . += 256K;
+
+    . = ALIGN(0x10);
     __heap_end = .;
+
+    __heap_size = (__heap_end - __heap_start);
   } > ram
 
   /* string tables */

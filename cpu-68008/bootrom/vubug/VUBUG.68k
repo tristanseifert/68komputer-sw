@@ -552,9 +552,12 @@ Loader_Handle_Tick:
 ; RAM Base address
   org     RAM_Monitor
 
-sarea:  dcb.w   $80,$0000               ;system stack
+; system stack (512 bytes)
+sarea:  dcb.w   512,0
 stack   =       *
-bktab:  dcb.l   $0a,$0000               ;breakpoint table
+
+; breakpoint table
+bktab:  dcb.l   $0a,$0000
 
 ; saved registers
 _sr:    dc.w    $0000
@@ -592,8 +595,8 @@ t5:     dc.w    $0000
 ctrls:  dc.w    $0000                   ;ctrl-s,ctrl-q flag
 bkptf   =       *-1                     ;breakpoint flag
 
-; user stack
-users:  dcb.w   $80,0000
+; user stack (512 bytes)
+users:  dcb.b   512,00
 ustck   =       *
 
 aend:   dc.l    $0000

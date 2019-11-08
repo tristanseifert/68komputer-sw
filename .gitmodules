@@ -7,3 +7,9 @@
 [submodule "cpu-68008/c/stdlib/tinyalloc"]
 	path = cpu-68008/c/stdlib/tinyalloc
 	url = git@github.com:thi-ng/tinyalloc.git
+[submodule "cpu-68008/c/stdlib/umm_malloc"]
+	path = cpu-68008/c/stdlib/umm_malloc
+	url = git@github.com:rhempel/umm_malloc.git
+[submodule "cpu-68008/c/stdlib/platform/umm_malloc"]
+	path = cpu-68008/c/stdlib/platform/umm_malloc
+	url = git@github.com:rhempel/umm_malloc.git

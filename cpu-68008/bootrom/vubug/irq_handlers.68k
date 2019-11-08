@@ -87,7 +87,7 @@ Trap_WriteMsgWithPc:
   rte
 
 Trap_WriteMsgWithPc_MsgTrap:
-  dc.b    lf,cr
+  dc.b    lf,cr, $7
   dc.b    "Trap at $", nul
   even
 
@@ -96,11 +96,11 @@ Trap_WriteMsgWithPc_MsgTrap:
 ; Breakpoint handler
 ;
 bhmes:
-  dc.b    lf,cr
+  dc.b    lf,cr, $7
   dc.b    "Breakpoint at $", nul
 
 binin:
-  dc.b    lf,cr
+  dc.b    lf,cr, $7
   dc.b    "Bad instruction at $", nul
   even
 
