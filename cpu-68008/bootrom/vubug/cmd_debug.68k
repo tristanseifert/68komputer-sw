@@ -86,10 +86,10 @@ regs:   bsr getch                       ;get delimiter
 rnoad:  lea     rtab1,a3                ;set default pointer value
       move.l  a3,rexam
 rplp:   lea     rmes,a0                 ;say hello
-      bsr     writs
+      bsr     Out_Puts
       bsr     rloc                    ;write starting loc value
 rlp:    lea     rprmp,a0                ;write register prompt
-      bsr     writs
+      bsr     Out_Puts
       bsr     getch                   ;get command
       moveq   #$2,d2                  ;set for search
       lea     rtab-4,a0
@@ -142,7 +142,7 @@ rloc:   bsr     crlf                    ;print register name and value
       move.b  $3(a4),d0
       bsr     writ
       lea     reqm,a0
-      bsr     writs
+      bsr     Out_Puts
       moveq   #$0,d0
       move.b  $1(a4),d0               ;write value
       beq     rpsr                    ;branch if sr
@@ -218,10 +218,10 @@ bno:    dbf     d1,blp1                 ;loop
         bne     brno                    ;Yes.
         andi.w  #$7fff,_sr              ;else clear trace bit
 brno:   lea     brmes,a0                ;say done
-        bsr     writs
+        bsr     Out_Puts
         bra     brts
 bdis:   lea     bdmes,a0                ;handle display all bkpts
-        bsr     writs
+        bsr     Out_Puts
         lea     bktab-4,a1              ;set loop
         moveq   #$4,d1
 bdlp:   adda.w  #$4,a1                  ;loop
@@ -249,7 +249,7 @@ bmo:    move.w  iloc(a1),d2             ;move to set condition codes
         move.w  (a2),instr(a1)          ;get instruction into table
         move.w  bkin,(a2)               ;set bkpt instruction
 bfnd:   lea     bpmes,a0                ;load message
-        bsr     writs
+        bsr     Out_Puts
         move.l  a2,d0
         bsr     OutHex_Word
         bclr    #$1,bkptf               ;clear in-single flag
@@ -277,12 +277,12 @@ bl3:    adda.w  #$4,a1                  ;loop
         bne     bok                     ;Yes
         andi.w  #$7fff,_sr              ;else clear trace flag
 bok:    lea     bmmes,a0                ;load message
-        bsr     writs
+        bsr     Out_Puts
         move.l  a2,d0                   ;print address
         bsr     OutHex_Word
         bra     brts
 bbad:   lea     bbmes,a0                ;error handler
-        bsr     writs
+        bsr     Out_Puts
 brts:   rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -305,7 +305,7 @@ Cmd_Trace:
 
   ; write the "Trace" message
   lea     .MsgTrace, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; did we read a + (turn trace on?)
   cmp.b   #'+', d1
@@ -339,7 +339,7 @@ Cmd_Trace:
 
 
 .Done:
-  bra     writs
+  bra     Out_Puts
 
 
 .MsgTrace:
@@ -373,7 +373,7 @@ Cmd_SingleStep:
 
   ; write the "single step" text
   lea     .MsgSingleStep, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; is it a + (turn on)
   cmp.b   #'+', d1
@@ -392,7 +392,7 @@ Cmd_SingleStep:
 
   ; write the "off" text
   lea     .MsgOff, a0
-  bsr     writs
+  bsr     Out_Puts
   bra     .Done
 
 .TurnOn:
@@ -403,7 +403,7 @@ Cmd_SingleStep:
 
   ; write the "on" text
   lea     .MsgOn, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; remove all breakpoints and enable trace
   bsr     brem
@@ -459,7 +459,7 @@ Cmd_Go_NoAddr:
 
   ; if not, print the "program" string
   lea     Cmd_Go_Msg_Program, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; print a newline
   bsr     Out_Divider

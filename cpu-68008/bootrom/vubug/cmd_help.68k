@@ -69,7 +69,7 @@ Cmd_Help:
 .PrintTopicLoop:
   ; print that short help message
   movea.w (a1), a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; check the next one
   addq.w  #6, a1
@@ -92,7 +92,7 @@ Cmd_Help:
 
   ; no such topic, so print all of them
   lea     .MsgNoSuchTopic, a0
-  bsr     writs
+  bsr     Out_Puts
 
   bra     .PrintAllTopics
 
@@ -103,12 +103,12 @@ Cmd_Help:
   ; print the "short help" (e.g. the title)
   addq.l  #2, a1
   movea.w (a1)+, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; then, print the long help (e.g. description)
   ; bsr     crlf
   movea.w (a1), a0
-  bra     writs
+  bra     Out_Puts
   ; rts
 
 

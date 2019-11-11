@@ -51,7 +51,7 @@ Cmd_MemCopy:
 
   ; output the success message
   lea     .MsgCopied, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; write start address
   move.l  d3, d0
@@ -59,7 +59,7 @@ Cmd_MemCopy:
 
   ; write " to "
   lea     .MsgTo, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; write destination address
   move.l  d2, d0
@@ -67,7 +67,7 @@ Cmd_MemCopy:
 
   ; write " for "
   lea     .MsgFor, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; write byte count
   move.l  d4, d0
@@ -75,7 +75,7 @@ Cmd_MemCopy:
 
   ; write the "bytes" string
   lea     .MsgBytes, a0
-  bsr     writs
+  bsr     Out_Puts
 
   rts
 
@@ -144,12 +144,12 @@ Cmd_MemUpdate:
 
   ; print memory mode message
   lea     mmes, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; print memory prompt
 .Prompt:
   lea     mprmp, a0
-  bsr     writs
+  bsr     Out_Puts
   bsr     getch
 
   ; search the command table
@@ -216,7 +216,7 @@ Cmd_MemUpdate:
   bsr     OutHex_Address
 
   lea     meqm, a0
-  bsr     writs
+  bsr     Out_Puts
 
   movea.l (exam), a0
   move.b  (a0), d0
@@ -297,7 +297,7 @@ Cmd_MemDump:
   ; display the header
   bsr     crlf
   lea     .MsgHeader, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; align the starting address to a 16 byte boundary
   move.l  a1, d0
@@ -319,7 +319,7 @@ Cmd_MemDump:
 
   ; write the divider between the address/hex area
   lea     .Divider, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; save the starting address
   movea.l a1, a3
@@ -341,7 +341,7 @@ Cmd_MemDump:
 
   ; write the divider between the hex/ascii area
   lea     .Divider, a0
-  bsr     writs
+  bsr     Out_Puts
   moveq   #$20, d0
   bsr     writ
 

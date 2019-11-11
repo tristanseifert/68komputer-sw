@@ -1,69 +1,42 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Bootloader API and defines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ; Periodic timer (ticks at 100Hz)
 Loader_Tick               = RAM_Loader
 
-; Level 1 interrupt vector address
-Loader_IRQ1               = RAM_Loader + $10
-; Level 2 interrupt vector address
-Loader_IRQ2               = RAM_Loader + $14
-; Level 3 interrupt vector address
-Loader_IRQ3               = RAM_Loader + $18
-; Level 4 interrupt vector address
-Loader_IRQ4               = RAM_Loader + $1C
-; Level 5 interrupt vector address
-Loader_IRQ5               = RAM_Loader + $20
-; Level 6 interrupt vector address
-Loader_IRQ6               = RAM_Loader + $24
-; Level 7 interrupt vector address
-Loader_IRQ7               = RAM_Loader + $28
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; In memory date/time variables (16 bytes)
+; In memory date/time variables (32 bytes)
 Loader_DateTimeBase       = RAM_Loader + $30
+Loader_DateTimeBaseSz     = $20
 
-Loader_DateYear           = Loader_DateTimeBase + $00
-Loader_DateMonth          = Loader_DateTimeBase + $01
-Loader_DateDay            = Loader_DateTimeBase + $02
-Loader_DateDayOfWeek      = Loader_DateTimeBase + $03
+Loader_DateCentury        = Loader_DateTimeBase + $00
+Loader_DateYear           = Loader_DateTimeBase + $01
+Loader_DateMonth          = Loader_DateTimeBase + $02
+Loader_DateDay            = Loader_DateTimeBase + $03
+Loader_DateDayOfWeek      = Loader_DateTimeBase + $04
 
-Loader_TimeHours          = Loader_DateTimeBase + $04
-Loader_TimeMinutes        = Loader_DateTimeBase + $05
-Loader_TimeSeconds        = Loader_DateTimeBase + $06
-Loader_TimeMSeconds       = Loader_DateTimeBase + $07
+Loader_TimeHours          = Loader_DateTimeBase + $05
+Loader_TimeMinutes        = Loader_DateTimeBase + $06
+Loader_TimeSeconds        = Loader_DateTimeBase + $07
+Loader_TimeMSeconds       = Loader_DateTimeBase + $08
 
 ; Buffer for reading/writing 64 bits from RTC
-Loader_RTCBuffer          = Loader_DateTimeBase + $08
+Loader_RTCBuffer          = Loader_DateTimeBase + $10
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 68681 buffers/state (128 bytes)
-Loader_68681Base          = RAM_Loader + $40
+Loader_68681Base          = (Loader_DateTimeBase + Loader_DateTimeBaseSz)
 
 ; output port state
-Loader_68681Out           = Loader_68681Base + $00
+Loader_68681Out           = Loader_68681Base
 ; input port state
-Loader_68681In            = Loader_68681Base + $01
+Loader_68681In            = Loader_68681Out + 1
 
 ; channel A status
-Loader_68681_StatusA      = Loader_68681Base + $02
-; channel A read buffer bytes occupied
-Loader_68681_ReadBufSzA   = Loader_68681Base + $03
-; channel A read buffer (32 bytes)
-Loader_68681_ReadBufA     = Loader_68681Base + $04
-
+MC68681_A_Status      = Loader_68681In + 1
+; channel A software flow control state
+MC68681_A_Flow            = MC68681_A_Status + 1
+; channel A echo control
+MC68681_A_Echo            = MC68681_A_Flow + 1
 ; channel B status
-Loader_68681_StatusB      = Loader_68681Base + $24
-; channel B read buffer bytes occupied
-Loader_68681_ReadBufSzB   = Loader_68681Base + $25
-; channel B read buffer (32 bytes)
-Loader_68681_ReadBufB     = Loader_68681Base + $26
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Address of $400 byte UART receive buffer
-Loader_Uart_Rx_Buffer     = RAM_Loader + $C00
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Location of API entry
-Loader_API_Entry          = ROM_Base + $7F80
+MC68681_B_Status      = MC68681_A_Echo + 1

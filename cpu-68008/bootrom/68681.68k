@@ -23,9 +23,6 @@ MC68681_Reset:
   move.l  d0, (a0)+
   dbf     d1, .Clear
 
-  ; install interrupt handler (level 2)
-  move.l  #MC68681_ISR, (Loader_IRQ2)
-
   ; copy registers
   lea     (MC68681_Reset_Data), a0
   lea     (MC68681_Base), a1
@@ -190,276 +187,80 @@ MC68681_UpdateInput:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Writes a string of bytes to an UART. This routine blocks until all data has
-; been transmitted.
-;
-; If there is too much of a wait to transmit a new byte (we wait for 2048
-; iterations of the tx ready check loop) the routine aborts.
+; Transmits the given byte of data on UART A or B.
 ;
 ; INPUTS:
-;   d0: High word: number of bytes to transmit. Low word: UART (0 = A, 1 = B)
-;   a0: Data to transmit
+;   d0: Character to send
 ;
-; OUTPUTS:
-;   d0: Status: 0 if successful, negative otherwise.
-;
-; Clobbers:
-;   d1, d2, a1
+; CLOBBERS:
+;   None
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-MC68681_UartTx:
-  ; set the base address: channel B uses same regs as A but at offset +$8
-  lea     (MC68681_Base), a1
+MC68681_Putch_A:
+  ; read the status register, check TXRDY bit (2), loop while clear
+  ; move.b  (MC68681_Base+MC68681_R_SRA), d0
+  btst    #2, (MC68681_Base+MC68681_R_SRA)
+  beq     MC68681_Putch_A
 
-  lsl.w   #3, d0
-  add.w   d0, a1
-
-  ; get just the number of bytes into d0
-  moveq   #0, d1
-  and.w   d1, d0
-  swap    d0
-
-  ; subtract one from the counter
-  subq.l  #1, d0
-
-.NextChar:
-  ; clear timeout counter
-  moveq   #0, d1
-
-.WaitTxRdy:
-  ; increment timeout: if it reaches 2048, abort
-  addq.l  #1, d1
-  btst    #11, d1
-  bne.s   .Timeout
-
-  ; wait for TXRDY or TXEMT to be set
-  move.b  MC68681_R_SRA(a1), d2
-  and.b   #%00001100, d2
-  beq.s   .WaitTxRdy
-
-  ; write a byte of data
-  move.b  (a0)+, MC68681_W_THRA(a1)
-
-  ; repeat until all data is written
-  dbf     d0, .NextChar
-
-.Done:
-  ; set success status
-  moveq   #0, d0
+  ; write character to DUART
+  move.b  d0,(MC68681_Base+MC68681_W_THRA)
   rts
 
-.Timeout:
-  ; set error code
-  moveq   #-1, d0
+MC68681_Putch_B:
+  ; read the status register, check TXRDY bit (2), loop while clear
+  ; move.b  (MC68681_Base+MC68681_R_SRA), d0
+  btst    #2, (MC68681_Base+MC68681_R_SRB)
+  beq     MC68681_Putch_B
+
+  ; write character to DUART
+  move.b  d0,(MC68681_Base+MC68681_W_THRB)
   rts
+
+
 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Reads a string from the UART. This will block until all bytes have been
-; received, or a timeout passes between characters, or a BREAK condition occurs
-; during that timeout. In both results, if some bytes have been written, they
-; will be returned.
+; Generic routine to pop a character off a receive queue in a1. Output char is
+; in d0, and we wait until data is available
 ;
-; Note that this will receive AT MOST as many bytes as requested.
-;
-; INPUTS:
-;   d0: High word: number of bytes to receive. Low word: UART (0 = A, 1 = B)
-;   a0: Data buffer
-;
-; OUTPUTS:
-;   d0: High word: status flags. Low word: actual number of bytes received.
-;
-; Clobbers:
-;   d1, d2, d3, a1
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Timeout waiting for data
-MC68681_UartRx_Timeout    = 31
-; Framing error during receive
-MC68681_UartRx_FramingErr = 30
-; Break received during receive
-MC68681_UartRx_Break      = 29
-; FIFO overrun during reception
-MC68681_UartRx_Overrun    = 28
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-MC68681_UartRx:
-  ; reset d3: this is the 'bytes read' counter
-  moveq   #0, d3
+; CLOBBERS:
+;   d0, d1, a1
+_MC68681_Getch:
+  ; nothing to do here hehe
+.tryAgain:
+  ; ensure interrupts are disabled while we check these fields
+  ori.w   #$0700, sr
 
-  ; set the base address: channel B uses same regs as A but at offset +$8
-  lea     (MC68681_Base), a1
+  ; is there a byte waiting in the buffer?
+  tst.b   UART_Queue_WritePtr(a1)
+  beq     .waitForByte
 
-  lsl.w   #3, d0
-  add.w   d0, a1
+  ; read the byte at the head and decrement write ptr
+  subq.b  #1, UART_Queue_WritePtr(a1)
 
-  ; get just the number of bytes into d0
-  moveq   #0, d1
-  and.w   d1, d0
-  swap    d0
+  lea     UART_Queue_Data(a1), a1
+  move.b  0(a1), d0
 
-  ; subtract one from the counter
-  subq.l  #1, d0
+  ; move queue (we copy all but the last byte)
+  moveq   #(UART_Queue_DataLen-2), d1
 
-.NextChar:
-  ; clear timeout counter
-  moveq   #0, d1
+.CopyLoop:
+  move.b  1(a1), (a1)
+  addq    #1, a1 ; XXX: can we use postincrement?
+  dbf     d1, .CopyLoop
 
-.WaitRxRdy:
-  ; increment timeout: if it reaches 2048, abort
-  addq.l  #1, d1
-  btst    #11, d1
-  bne.s   .Timeout
-
-  ; wait for break received, framing error, overrun, FIFO full, RXRDY
-  move.b  MC68681_R_SRA(a1), d2
-  and.b   #%11010001, d2
-  beq.s   .WaitRxRdy
-
-  ; is 'byte ready' set?
-  btst    #0, d2
-  bne.s   .ReadData
-
-  ; did we overrun the FIFO?
-  btst    #4, d2
-  bne.s   .Overrun
-  ; is framing error set?
-  btst    #6, d2
-  bne.s   .FramingError
-  ; is break set?
-  btst    #7, d2
-  bne.s   .Break
-
-  ; we should NEVER get here...
-  bra.s   .WaitRxRdy
-
-.ReadData:
-  ; receive a byte of data and increment counter
-  move.b  MC68681_R_RHRA(a1), (a0)+
-  addq.b  #1, d3
-
-  ; repeat until all data is read
-  dbf     d0, .NextChar
-
-
-.Done:
-  ; copy counter
-  moveq   #0, d0
-  move.w  d3, d0
-
-.Cleanup:
+  ; we're done!
+  andi.w  #$f8ff, sr
   rts
 
+  ; waits for a byte to be received: really, this waits for an interrupt before
+  ; trying again but whatever man
+.waitForByte:
+  ; this will re-enable interrupts implicitly
+  stop    #$2000
+  bra     .tryAgain
 
 
-.Timeout:
-  ; signify timeout condition
-  moveq   #0, d0
-  move.w  d3, d0
-  bset    #MC68681_UartRx_Timeout, d0
-  rts
-
-.FramingError:
-  ; do a dummy read to clear the error
-  move.b  MC68681_R_RHRA(a1), d0
-
-  ; signify framing error condition
-  moveq   #0, d0
-  move.w  d3, d0
-  bset    #MC68681_UartRx_FramingErr, d0
-  rts
-
-.Break:
-  ; acknowledge break
-  move.b  #%01010000, MC68681_W_CRA(a1)
-
-  ; signify break condition
-  moveq   #0, d0
-  move.w  d3, d0
-  bset    #MC68681_UartRx_Break, d0
-  rts
-
-.Overrun:
-  ; acknowledge overrun
-  move.b  #%01000000, MC68681_W_CRA(a1)
-
-  ; signify overrun condition
-  moveq   #0, d0
-  move.w  d3, d0
-  bset    #MC68681_UartRx_Overrun, d0
-  rts
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Reads a single character from the UART.
-;
-; INPUTS:
-;   d0: High word: number of bytes to receive. Low word: UART (0 = A, 1 = B)
-;
-; OUTPUTS:
-;   d0: High word: status flags. Low word: character read.
-;
-; Clobbers:
-;   d0, d1, a0
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-MC68681_UartRxChar:
-  ; set the base address: channel B uses same regs as A but at offset +$8
-  lea     (MC68681_Base), a0
-
-  lsl.w   #3, d0
-  add.w   d0, a1
-
-  ; d0 is our eventual output
-  moveq   #0, d0
-
-.WaitLoop:
-  ; wait for break received, framing error, overrun, FIFO full, RXRDY
-  move.b  MC68681_R_SRA(a0), d1
-  and.b   #%11010001, d1
-  beq.s   .WaitLoop
-
-  ; is 'byte ready' set?
-  btst    #0, d1
-  bne.s   .ReadData
-
-  ; did we overrun the FIFO?
-  btst    #4, d1
-  bne.s   .Overrun
-  ; is framing error set?
-  btst    #6, d1
-  bne.s   .FramingError
-  ; is break set?
-  btst    #7, d1
-  bne.s   .Break
-
-  ; we should NEVER get here...
-  bra.s   .WaitLoop
-
-.ReadData:
-  ; read the character
-  move.b  MC68681_R_RHRA(a1), d0
-  rts
-
-.FramingError:
-  ; do a dummy read to clear the error
-  move.b  MC68681_R_RHRA(a1), d0
-
-  ; signify framing error condition
-  bset    #MC68681_UartRx_FramingErr, d0
-  rts
-
-.Break:
-  ; acknowledge break
-  move.b  #%01010000, MC68681_W_CRA(a1)
-
-  ; signify break condition
-  bset    #MC68681_UartRx_Break, d0
-  rts
-
-.Overrun:
-  ; acknowledge overrun
-  move.b  #%01000000, MC68681_W_CRA(a1)
-
-  ; signify overrun condition
-  bset    #MC68681_UartRx_Overrun, d0
-  rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 68681 ISR
@@ -472,40 +273,147 @@ MC68681_UartRxChar:
 ; address of the routine is obtained by preserving the old value of Loader_IRQ2.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 MC68681_ISR:
-  ; save regs
-  move.l  d0, -(sp)
+  ; save regs and load 68681 base address
+  movem.l d0-d1/a0/a6, -(sp)
+  lea     MC68681_Base, a6
 
   ; read ISR state
-  move.b  (MC68681_Base+MC68681_R_ISR), d0
+  move.b  MC68681_R_ISR(a6), d0
 
+  ; timer expired?
+  btst    #3, d0
+  beq     .checkChABreak
+
+  ; increment the tick counter and send "STOP COUNTER" cmd to reset
+  addq.l  #1, (Loader_Tick)
+  move.b  MC68681_R_STC(a6), d1
+
+.checkChABreak:
   ; channel A break?
   btst    #2, d0
-  beq.s   .checkCounter
+  beq     .checkChannelBRx
 
   ; acknowledge interrupt ("reset break irq flag" command to channel A)
-  move.b  #%01010000, (MC68681_Base+MC68681_W_CRA)
+  move.b  #%01010000, MC68681_W_CRA(a6)
 
-  ; TODO: jump to monitor
-  nop
+  ; print message
+  ; lea     .MsgBreak, a0
+  ; bsr     Out_Puts
 
-.checkCounter:
-  ; "counter ready" flag set?
-  btst    #3, d0
-  beq.s   .checkDone
+  ; jump back to command prompt
+  movem.l (sp)+, d0-d1/a0/a6
+  bra     VUBUG_Restart
 
-  ; yes, acknowledge the interrupt by issuing STOP COUNTER cmd
-  ; XXX: this corrupts d0 but it's not used after
-  move.b  (MC68681_Base+MC68681_R_STC), d0
+.checkChannelBRx:
+  ; channel B receive?
+  btst    #5, d0
+  beq     .checkChannelARx
 
-  ; also, invoke loader timer routine
-  bsr.w   Loader_Handle_Tick
+  ; read from this channel (save d0)
+  move.b  d0, -(sp)
+  bsr     .ChB_Rx
+  move.b  (sp)+, d0
 
-  ; no bits were set or fall thru from counter
-.checkDone:
-  ; done with all checks
+.checkChannelARx:
+  ; channel A receive?
+  btst    #1, d0
+  beq     .checksDone
 
-.restore:
+  ; read from this channel (save d0)
+  move.b  d0, -(sp)
+  bsr     .ChA_Rx
+  move.b  (sp)+, d0
 
-.done:
-  move.l  (sp)+, d0
+.checksDone:
+  ; done, clean up
+  movem.l (sp)+, d0-d1/a0/a6
+  rte
+
+.MsgBreak:
+  dc.b    "Break", cr, lf, nul
+  even
+
+
+
+; Reads the data from the Channel A register and adds it to the receive queue
+.ChA_Rx:
+  ; read byte
+  move.b  MC68681_R_RHRA(a6), d0
+
+  ; did we receive a Ctrl+C?
+  cmp.b   #$3, d0
+  beq     .ChA_Rx_CtrlC
+  ; did we receive Ctrl+S?
+  cmp.b   #$13, d0
+  beq     .ChA_Rx_CtrlS
+  ; did we receive Ctrl+Q?
+  cmp.b   #$11, d0
+  beq     .ChA_Rx_CtrlQ
+
+  ; if we get here, we should stuff the received byte into the queue
+  lea     (UART_A_Queue), a0
+  bsr     .Rx_Queue_Push
+
+  ; is echo turned on?
+  btst    #0, (MC68681_A_Echo)
+  beq.s   .ChA_Rx_Done
+
+  bra     Out_Putc
+
+.ChA_Rx_Done:
+  rts
+
+  ; Handle Ctrl+S: we set a flag and terminat
+.ChA_Rx_CtrlS:
+  move.b  #$1, (MC68681_A_Flow)
+  bra     .ChA_Rx_Done
+  ; Handle Ctrl+Q: clear the control flag and exit
+.ChA_Rx_CtrlQ:
+  move.b  #$00, (MC68681_A_Flow)
+  bra     .ChA_Rx_Done
+
+  ; Handle Ctrl+C: (should return to prompt)
+.ChA_Rx_CtrlC:
+  ; restore the registers and jump to restart routine
+  movem.l (sp)+, d0-d1/a0
+  bra     VUBUG_Restart
+
+
+; Reads the data from the Channel B register and adds it to the receive queue
+.ChB_Rx:
+  ; read byte
+  move.b  MC68681_R_RHRB(a6), d0
+
+  ; add the byte to the queue
+  lea     (UART_B_Queue), a0
+  bra     .Rx_Queue_Push
+
+  rts
+
+
+; Pushes the byte character in d0 into the queue whose header is in a0.
+;
+; TODO: The carry flag is set if the queue did not have space available.
+;
+; Clobbers:
+;   d0, a0, d1
+.Rx_Queue_Push:
+  ; is there space in the queue?
+  moveq   #0, d1
+  move.b  UART_Queue_WritePtr(a0), d1
+
+  cmp.b   #(UART_Queue_DataLen-1), d1
+  bge     .QueueFull
+
+  ; yep, write it to where the write pointer says
+  move.b  d0, UART_Queue_Data(a0, d1.w)
+
+  ; increment write pointer
+  addq.b  #1, UART_Queue_WritePtr(a0)
+
+  ; we pushed the byte, clear carry flag
+  rts
+
+  ; the queue is full :(
+.QueueFull:
   rts

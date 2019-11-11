@@ -220,7 +220,6 @@ start:
 
   ; RXRDY_B, timer, break_A, RXRDY_A; then install our IRQ handler
   move.b  #%00101110, (MC68681_Base+MC68681_W_IMR)
-  ; move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
 ; set up buffers
 gwan:
@@ -240,7 +239,6 @@ gwan:
 
   ; clear control variables
   move.l  d0, (exam)
-  move.b  d0, (ctrls)
   move.b  d0, (bkptf)
 
   ; clear the timer counter value
@@ -281,11 +279,11 @@ gwan:
   ; setup is done. enable IRQs, and output the header/version
   move.w  ssri, sr
   lea     howdy, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; build date
   lea     Msg_BuildDate, a0
-  bsr     writs
+  bsr     Out_Puts
   bsr     crlf
 
   ; enable the receivers here
@@ -331,7 +329,6 @@ VUBUG_Restart:
 
   ; enable channel a/b rx, channel a break, timer
   move.b  #%00101110, (MC68681_Base+MC68681_W_IMR)
-  ; move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
   ; then, enable the receivers
   bsr     MC68681_EnableRx
@@ -394,7 +391,7 @@ code    =       $2
 comm:
   ; display command prompt
   lea     Msg_Prompt, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; ensure echo is on
   bsr     Echo_On
@@ -427,7 +424,7 @@ clp:
 .BadCommand:
   ; print a "bad command" message
   lea     Msg_InvalidCommand, a0
-  bsr     writs
+  bsr     Out_Puts
   bra     comm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -437,7 +434,7 @@ Cmd_StartBasic:
 
   ; print message
   lea     .MsgDecompressing, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; load the app and st ore its address
   lea     $00008008, a0
@@ -446,7 +443,7 @@ Cmd_StartBasic:
 
   ; print the address
   lea     .MsgLoadedTo, a0
-  bsr     writs
+  bsr     Out_Puts
 
   move.l  (_pc), d0
   bsr     OutHex_Long

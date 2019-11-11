@@ -24,7 +24,7 @@ RAM_Vector_Init:
   ; install our 68681 vector
   lea     RAM_Vector_Irq2, a0
   move.w  #$4EF9, (a0)+
-  move.l  #VUBUG_MC68681_ISR, (a0)+
+  move.l  #MC68681_ISR, (a0)+
 
   ; install the trap 0 (exit) handler
   lea     RAM_Vector_Trap0, a0
@@ -76,11 +76,10 @@ Trap_WriteMsgWithPc:
   ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
   ; move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
   move.b  #%00101110, (MC68681_Base+MC68681_W_IMR) ; also adds timer ready
-  move.l  #VUBUG_MC68681_ISR, (Loader_IRQ2)
 
-  bsr     writs
+  bsr     Out_Puts
 
-; ghpr1:  bsr     writs
+; ghpr1:  bsr     Out_Puts
 
   ; print PC
   move.l  (_pc), d0
@@ -128,7 +127,7 @@ bhlr:
 .IsBkpt:
   ; write breakpoint message and address of PC
   lea     bhmes, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  (_pc), d0
   bsr     OutHex_Address
   bsr     crlf
@@ -194,7 +193,7 @@ treal:  move.l  $2(a7),_pc              ;Not (just) a bkpt but trace or single
         pea     comm                    ;fake return to comm
         move.w  ssri,-(a7)              ;enable interrupts on return
 trpr:   lea     tlocm,a0                ;wx message
-        bsr     writs
+        bsr     Out_Puts
 
         move.l  (_pc), d0
         bsr     OutHex_Long
@@ -295,7 +294,7 @@ Svc_Exit_Trap:
 
   ; print a message
   ; lea     .MsgExit, a0
-  ; bsr     writs
+  ; bsr     Out_Puts
 
   ; wait for character to finish writing
 ; .waitTxRdy:

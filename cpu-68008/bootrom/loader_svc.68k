@@ -7,10 +7,10 @@
 Svc_Table:
   ; 00: no-op
   dc.w    Svc_NoOp-Svc_Table
-  ; 01: write bytes to UART
-  dc.w    Svc_UartOut-Svc_Table
-  ; 02: read bytes from UART
-  dc.w    Svc_UartIn-Svc_Table
+  ; 01: no-op
+  dc.w    Svc_NoOp-Svc_Table
+  ; 02: no-op
+  dc.w    Svc_NoOp-Svc_Table
   ; 03: Delay program
   dc.w    Svc_Delay-Svc_Table
   ; 04: Get input state
@@ -52,112 +52,6 @@ Svc_NoOp:
   rts
 
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; 01 - Writes a byte buffer to the specified UART.
-;
-; NOTE: This does NOT handle zero-terminated strings by default.
-;
-; INPUTS:
-;   a1: Buffer to read from
-;   d1: Number of bytes to write (high word) and UART number (low word)
-; OUTPUTS:
-;   d0: Error code (negative) or bytes written (> 0)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Svc_UartOut:
-  ; back up registers
-  move.l  d2, -(sp)
-
-  ; is the UART number in range?
-  cmp.w   #2, d1
-  bge.s   .UartNumOutOfRange
-
-  ; length should be nonzero
-  swap    d1
-  tst.w   d1
-  beq.s   .InvalidLength
-  swap    d1
-
-  ; write to the appropriate UART
-  move.l  a1, a0
-  move.l  d1, d0
-  bsr.w   MC68681_UartTx
-
-.Done:
-  ; Restore registers
-  move.l  d2, (sp)+
-
-  rts
-
-.UartNumOutOfRange:
-  moveq   #-2, d0
-  bra.s   .Done
-.InvalidLength:
-  moveq   #-1, d0
-  bra.s   .Done
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; 02 - Reads a byte buffer from the specified UART.
-;
-; INPUTS:
-;   a1: Buffer to read data to
-;   d1: Number of bytes to read (high word) and UART number (low word)
-; OUTPUTS:
-;   d0: Error code (negative) or bytes read (> 0)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Svc_UartIn:
-  ; back up registers
-  movem.l  d2-d3, -(sp)
-
-  ; is the UART number in range?
-  cmp.w   #2, d1
-  bge.s   .UartNumOutOfRange
-
-  ; length should be nonzero
-  swap    d1
-  tst.w   d1
-  beq.s   .InvalidLength
-  swap    d1
-
-  ; read from the appropriate UART
-  move.l  a1, a0
-  move.l  d1, d0
-  bsr.w   MC68681_UartRx
-
-  ; reformat return code d0
-  swap    d0
-  tst.w   d0
-  bne.s   .NoError
-
-  ; there were errors. extract them
-  moveq   #0, d2
-  swap    d0
-  and.w   d2, d0
-  swap    d0
-  neg.l   d0
-
-  bra.s   .Done
-
-.NoError:
-  ; nothing needs to be done, we're good
-  nop
-
-.Done:
-  ; restore registers
-  movem.l  (sp)+, d2-d3
-  rts
-
-.UartNumOutOfRange:
-  moveq   #-2, d0
-  bra.s   .Done
-.InvalidLength:
-  moveq   #-1, d0
-  bra.s   .Done
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 03 - Waits for a certain period of time.
 ;
@@ -180,7 +74,7 @@ Svc_Delay:
   stop    #$2000 ; wait for an irq
 
   cmp.l   (a0), d0
-  bne     .wait
+  bhi     .wait
 
   rts
 
@@ -274,11 +168,13 @@ Svc_ReadRtc:
   tst.l   d0
   beq     .NoStruct
 
-  ; copy 8 bytes
+  ; copy 9 bytes
   lea     Loader_DateTimeBase, a0
+  moveq   #8, d0
 
-  move.l  (a0)+, (a1)+
-  move.l  (a0), (a1)
+.CopyLoop:
+  move.b  (a0)+, (a1)+
+  dbf     d0, .CopyLoop
 
 .NoStruct:
   ; restore registers
@@ -304,11 +200,13 @@ Svc_WriteRtc:
   tst.l   d0
   beq     .NoStruct
 
-  ; copy 8 bytes of struct
+  ; copy 9 bytes of struct
   lea     Loader_DateTimeBase, a0
+  moveq   #8, d0
 
-  move.l  (a1)+, (a0)+
-  move.l  (a1), (a0)
+.CopyLoop:
+  move.b  (a1)+, (a0)+
+  dbf     d0, .CopyLoop
 
 .NoStruct:
   bsr.w   RTC_Write
@@ -359,7 +257,7 @@ Svc_Getc:
   movem.l d1/a1, -(sp)
 
   lea     UART_A_Queue, a1
-  bsr     VUBUG_MC68681_Getch
+  bsr     _MC68681_Getch
 
   movem.l (sp)+, d1/a1
   rts

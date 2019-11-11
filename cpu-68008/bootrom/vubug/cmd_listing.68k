@@ -35,7 +35,7 @@ Cmd_Disassemble:
         bne     aexam           ;else get address
         movea.l exam,a1         ;get exam
         lea     ames,a0         ;write message
-        bsr     writs
+        bsr     Out_Puts
         move.b  #$13,d2         ;load 19 into d2
 ass20:  bsr     ass1            ;list a single instruction
         dbf     d2,ass20        ;if not finished, decrement and go again
@@ -50,7 +50,7 @@ aexam:  bsr     InHex_Long            ;get starting address
         move.l  d0,aend         ;save it
 
         lea     ames,a0         ;write message
-        bsr     writs
+        bsr     Out_Puts
 
 assxy:  bsr     ass1            ;list a single instruction
         cmpa.l  aend,a1         ;reached the end of the range yet?
@@ -59,7 +59,7 @@ assxy:  bsr     ass1            ;list a single instruction
         rts
 
 acom:   lea     ames,a0         ;write message
-        bsr     writs
+        bsr     Out_Puts
         move.b  #$13,d2         ;load 19 into d2
         bra     ass20           ;jump to dump 20 routine
 
@@ -101,7 +101,7 @@ gr0:    move.w  d1,d0
         cmpi.w  #$023c,d0       ;is it ANDIccr?
         bne     ANDIsr          ;no.
         lea     mANDI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -109,12 +109,12 @@ gr0:    move.w  d1,d0
         bsr     OutHex_Byte           ;write it
         bsr     comma
         lea     mccr,a0         ;load "ccr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 ANDIsr: cmpi.w  #$027c,d0       ;is it ANDIsr?
         bne     EORIcr          ;no.
         lea     mANDI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -122,12 +122,12 @@ ANDIsr: cmpi.w  #$027c,d0       ;is it ANDIsr?
         bsr     OutHex_Word           ;write it
         bsr     comma
         lea     msr,a0          ;load "sr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 EORIcr: cmpi.w  #$0a3c,d0       ;is it EORIccr?
         bne     EORIsr          ;no.
         lea     mEORI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -135,12 +135,12 @@ EORIcr: cmpi.w  #$0a3c,d0       ;is it EORIccr?
         bsr     OutHex_Byte           ;write it
         bsr     comma
         lea     mccr,a0         ;load "ccr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 EORIsr: cmpi.w  #$0a7c,d0       ;is it EORIsr?
         bne     ORIccr          ;no.
         lea     mEORI,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -148,12 +148,12 @@ EORIsr: cmpi.w  #$0a7c,d0       ;is it EORIsr?
         bsr     OutHex_Word           ;write it
         bsr     comma
         lea     msr,a0          ;load "sr"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 ORIccr: cmpi.w  #$003c,d0       ;is it ORIccr?
         bne     ORIsr           ;no.
         lea     mORI,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -161,12 +161,12 @@ ORIccr: cmpi.w  #$003c,d0       ;is it ORIccr?
         bsr     OutHex_Byte           ;write it
         bsr     comma
         lea     mccr,a0         ;load "ccr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 ORIsr:  cmpi.w  #$007c,d0       ;is it ORIsr?
         bne     ADDI            ;no.
         lea     mORI,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -174,38 +174,38 @@ ORIsr:  cmpi.w  #$007c,d0       ;is it ORIsr?
         bsr     OutHex_Word           ;write it
         bsr     comma
         lea     msr,a0          ;load "sr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 ADDI:   andi.w  #$0f00,d0       ;mask operation bits
         cmpi.w  #$0600,d0       ;is it ADDI?
         bne     ANDI            ;no.
         lea     mADDI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     iops            ;go print operands
 ANDI:   cmpi.w  #$0200,d0       ;is it ANDI?
         bne     CMPI            ;no.
         lea     mANDI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     iops            ;go print operands
 CMPI:   cmpi.w  #$0c00,d0       ;is it CMPI?
         bne     EORI            ;no.
         lea     mCMPI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     iops            ;go print operands
 EORI:   cmpi.w  #$0a00,d0       ;is it EORI?
         bne     ORI             ;no.
         lea     mEORI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     iops            ;go print operands
 ORI:    cmpi.w  #$0000,d0       ;is it ORI?
         bne     SUBI            ;no.
         lea     mORI,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     iops            ;go print operands
 SUBI:   cmpi.w  #$0400,d0       ;is it SUBI?
         bne     MOVEP           ;no.
         lea     mSUBI,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
 iops:   move.w  d1,d0
         andi.w  #$00c0,d0       ;check the size to see if it is legal
         cmpi.w  #$00c0,d0       ;is it size 11?
@@ -240,7 +240,7 @@ MOVEP:  move.w  d1,d0
         cmpi.w  #$0108,d0       ;is it a MOVEP?
         bne     bitop           ;if not, it's a bit operation
         lea     mMOVEP,a0       ;load "MOVEP"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         andi.w  #$0040,d0       ;word or longword
@@ -291,20 +291,20 @@ bitop:  move.w  d1,d0
         andi.w  #$00c0,d0       ;mask bitop select bits
         bne     BCHG            ;it's not BTST
         lea     mBTST,a0        ;load "BTST"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     bitop2          ;go print operands
 BCHG:   cmpi.w  #$0040,d0
         bne     BCLR            ;it's not BCHG
         lea     mBCHG,a0        ;load "BCHG"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     bitop2          ;go print operands
 BCLR:   cmpi.w  #$0080,d0
         bne     BSET            ;it's not BCLR
         lea     mBCLR,a0        ;load "BCLR"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     bitop2          ;go print operands
 BSET:   lea     mBSET,a0        ;load "BSET"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
 bitop2: bsr     spc
         move.w  d1,d0
         andi.w  #$0100,d0       ;is it reg or immediate operand?
@@ -336,7 +336,7 @@ MOVE:   move.w  d1,d0
         cmpi.w  #$0040,d0       ;is it MOVEA?
         beq     MOVEA           ;if so, go do MOVEA
         lea     mMOVE,a0        ;load "MOVE"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         bsr     findend         ;write the size
         bsr     spc
@@ -355,7 +355,7 @@ MOVEA:  move.b  siz,d0          ;load the size.
         cmpi.b  #$42,d0         ;is it a byte?
         beq     ILLEG           ;if so, this is not a valid instruction
         lea     mMOVEA,a0       ;load "MOVEA"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         bsr     findend         ;write the size
         bsr     spc
@@ -372,32 +372,32 @@ gr4:    move.w  d1,d0
 NOP:    cmpi.w  #$4e71,d0       ;is it a NOP?
         bne     RESET           ;no
         lea     mNOP,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 RESET:  cmpi.w  #$4e70,d0       ;is it RESET?
         bne     RTE             ;no
         lea     mRESET,a0       ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 RTE:    cmpi.w  #$4e73,d0       ;is it RTE?
         bne     RTR             ;no
         lea     mRTE,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 RTR:    cmpi.w  #$4e77,d0       ;is it RTR?
         bne     RTS             ;no
         lea     mRTR,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 RTS:    cmpi.w  #$4e75,d0       ;is it RTS?
         bne     STOP            ;no
         lea     mRTS,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 STOP:   cmpi.w  #$4e72,d0       ;is it STOP?
         bne     TRAPV           ;no
         lea     mSTOP,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -407,7 +407,7 @@ STOP:   cmpi.w  #$4e72,d0       ;is it STOP?
 TRAPV:  cmpi.w  #$4e76,d0       ;is it TRAPV?
         bne     JMP             ;no
         lea     mTRAPV,a0       ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 JMP:    andi.w  #$0fc0,d0       ;mask bits for one <ea> operations
         cmpi.w  #$0ec0,d0       ;is it JMP?
@@ -422,7 +422,7 @@ JMP:    andi.w  #$0fc0,d0       ;mask bits for one <ea> operations
         cmpi.w  #$0020,d0       ;this instruction
         beq     ILLEG
         lea     mJMP,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea0           ;go write operand
 JSR:    cmpi.w  #$0e80,d0       ;is it JSR?
         bne     MOVtc           ;no
@@ -436,7 +436,7 @@ JSR:    cmpi.w  #$0e80,d0       ;is it JSR?
         cmpi.w  #$0020,d0       ;this instruction
         beq     ILLEG
         lea     mJSR,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea0           ;go write operand
 MOVtc:  cmpi.w  #$04c0,d0       ;is it MOVEtoccr?
         bne     MOVfc           ;no
@@ -445,13 +445,13 @@ MOVtc:  cmpi.w  #$04c0,d0       ;is it MOVEtoccr?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mMOVE,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bsr     spc
         move.w  d1,d0
         bsr     writea          ;write the source operand
         bsr     comma
         lea     mccr,a0         ;load "ccr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 MOVfc:  cmpi.w  #$02c0,d0       ;is it MOVEfromccr?
         bne     MOVts           ;no
@@ -460,10 +460,10 @@ MOVfc:  cmpi.w  #$02c0,d0       ;is it MOVEfromccr?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mMOVE,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bsr     spc
         lea     mccr,a0         ;load "ccr"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     comma
         move.w  d1,d0
         bsr     writea          ;write the operand
@@ -475,13 +475,13 @@ MOVts:  cmpi.w  #$06c0,d0       ;is it MOVEtosr?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mMOVE,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bsr     spc
         move.w  d1,d0
         bsr     writea          ;write the source operand
         bsr     comma
         lea     msr,a0          ;load "sr"
-        bsr     writs
+        bsr     Out_Puts
         bra     disend
 MOVfs:  cmpi.w  #$00c0,d0       ;is it MOVEfromsr?
         bne     NBCD            ;no
@@ -490,10 +490,10 @@ MOVfs:  cmpi.w  #$00c0,d0       ;is it MOVEfromsr?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mMOVE,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bsr     spc
         lea     msr,a0          ;load "sr"
-        bsr     writs
+        bsr     Out_Puts
         bsr     comma
         move.w  d1,d0
         bsr     writea          ;write the operand
@@ -505,7 +505,7 @@ NBCD:   cmpi.w  #$0800,d0       ;is it NBCD?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mNBCD,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea0           ;go write operand
 PEA:    cmpi.w  #$0840,d0       ;is it PEA?
         bne     TAS             ;no
@@ -519,7 +519,7 @@ PEA:    cmpi.w  #$0840,d0       ;is it PEA?
         cmpi.w  #$0020,d0       ;this instruction
         beq     ILLEG
         lea     mPEA,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea0           ;go write operand
 TAS:    cmpi.w  #$0AC0,d0       ;is it TAS?
         bne     CLR             ;no
@@ -533,7 +533,7 @@ TAS:    cmpi.w  #$0AC0,d0       ;is it TAS?
         andi.w  #$0006,d0
         bne     ILLEG           ;certain of them are bad
 tasok:  lea     mTAS,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
 gtea0:  bsr     spc
         move.w  d1,d0
         bsr     writea          ;write the operand
@@ -546,7 +546,7 @@ CLR:    andi.w  #$0f00,d0       ;mask <ea> + <size> operations
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mCLR,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea1           ;go write operand
 NEG:    cmpi.w  #$0400,d0       ;is it NEG?
         bne     NEGX            ;no
@@ -555,7 +555,7 @@ NEG:    cmpi.w  #$0400,d0       ;is it NEG?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mNEG,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea1           ;go write operand
 NEGX:   cmpi.w  #$0000,d0       ;is it NEGX?
         bne     NOT             ;no
@@ -564,7 +564,7 @@ NEGX:   cmpi.w  #$0000,d0       ;is it NEGX?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mNEGX,a0        ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea1           ;go write operand
 NOT:    cmpi.w  #$0600,d0       ;is it NOT?
         bne     TST             ;no
@@ -573,7 +573,7 @@ NOT:    cmpi.w  #$0600,d0       ;is it NOT?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mNOT,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
         bra     gtea1           ;go write operand
 TST:    cmpi.w  #$0A00,d0       ;is it TST?
         bne     BKPT            ;no
@@ -582,7 +582,7 @@ TST:    cmpi.w  #$0A00,d0       ;is it TST?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mTST,a0         ;yes, print
-        bsr     writs
+        bsr     Out_Puts
 gtea1:  bsr     dot
         move.w  d1,d0
         bsr     findsiz         ;print the operand length
@@ -595,7 +595,7 @@ BKPT:   move.w  d1,d0
         cmpi.w  #$4848,d0       ;is it BKPT?
         bne     LINK            ;no
         lea     mBKPT,a0        ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask BKPT number
@@ -611,7 +611,7 @@ LINK:   move.w  d1,d0
         cmpi.w  #$4e50,d0       ;is it a LINK?
         bne     MOVEsp          ;no
         lea     mLINK,a0        ;load "LINK"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask reg bits
@@ -627,7 +627,7 @@ MOVEsp: move.w  d1,d0
         cmpi.w  #$4e60,d0       ;is it MOVEusp?
         bne     TRAP            ;no
         lea     mMOVE,a0        ;yes, so load "MOVE"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         andi.w  #$0008,d0       ;mask direction bit
@@ -637,10 +637,10 @@ MOVEsp: move.w  d1,d0
         bsr     wareg           ;write it
         bsr     comma
         lea     musp,a0         ;load "usp"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 MOVEts: lea     musp,a0         ;load "usp"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     comma
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask reg bits
@@ -651,7 +651,7 @@ TRAP:   move.w  d1,d0
         cmpi.w  #$4e40,d0       ;is it TRAP?
         bne     SWAP            ;no
         lea     mTRAP,a0        ;yes
-        bsr     writs
+        bsr     Out_Puts
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -664,7 +664,7 @@ SWAP:   move.w  d1,d0
         cmpi.w  #$4840,d0       ;is it SWAP?
         bne     UNLK            ;no
         lea     mSWAP,a0        ;load "swap"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask off the reg bits
@@ -673,7 +673,7 @@ SWAP:   move.w  d1,d0
 UNLK:   cmpi.w  #$4e58,d0       ;is it UNLK?
         bne     LEA             ;no
         lea     mUNLK,a0        ;load "UNLK"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         andi.w  #$0007,d0       ;mask off reg number
@@ -693,7 +693,7 @@ LEA:    move.w  d1,d0
         cmpi.w  #$0020,d0       ;this instruction
         beq     ILLEG
         lea     mLEA,a0         ;load "LEA"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         bsr     writea          ;write source op
@@ -710,7 +710,7 @@ CHK:    cmpi.w  #$4180,d0       ;is it CHK?
         cmpi.w  #$0008,d0       ;these are not
         beq     ILLEG
         lea     mCHK,a0         ;load "CHK"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         move.b  #$77,siz        ;size is word
         bsr     spc
         move.w  d1,d0
@@ -726,7 +726,7 @@ EXT:    move.w  d1,d0
         cmpi.w  #$4880,d0       ;is it EXT?
         bne     MOVEC           ;no
         lea     mEXT,a0         ;yes, load "EXT"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         andi.w  #$0040,d0       ;mask the size bit
@@ -746,7 +746,7 @@ MOVEC:  move.w  d1,d0
         cmpi.w  #$4e7b,d0       ;is it a MOVEC?
         bne     MOVEM           ;no
         lea     mCOPOUT,a0      ;yes, so load "COPOUT"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         move.w  (a1)+,d0        ;compensate for the operand word
         bra     disend
 MOVEM:  move.w  d1,d0
@@ -754,7 +754,7 @@ MOVEM:  move.w  d1,d0
         cmpi.w  #$4880,d0       ;is it MOVEM?
         bne     ILLEG           ;no
         lea     mMOVEM,a0       ;yes, load "MOVEM"
-        bsr     writs
+        bsr     Out_Puts
         bsr     dot
         move.w  d1,d0
         andi.w  #$0040,d0       ;mask MOVEM size bit
@@ -787,7 +787,7 @@ MOVEMr: move.w  (a1)+,t1        ;save the reg list
         bsr     OutHex_Word           ;write it
         bra     disend
 ILLEG:  lea     mILLEG,a0       ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     disend
 
 gr5:    move.w  d1,d0           ;refresh the instruction word
@@ -857,7 +857,7 @@ addq:   move.w  d1,d0
         lea     mADDQ,a0        ;load "addq"
         bra     qwrit
 subq:   lea     mSUBQ,a0        ;load "subq"
-qwrit:  bsr     writs           ;write it
+qwrit:  bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         bsr     findsiz         ;write size of operand
@@ -879,12 +879,12 @@ gr6:    move.w  d1,d0
         andi.w  #$0f00,d0       ;mask the cond bit
         bne     BSR             ;not BRA
         lea     mBRA,a0         ;load "bra"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     Bccw            ;go write operand
 BSR:    cmp.w   #$0100,d0       ;BSR?
         bne     Bcc             ;no
         lea     mBSR,a0         ;load "bsr"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     Bccw            ;go write operand
 Bcc:    move.b  #$62,d0         ;load a B
         bsr     writ            ;write it
@@ -899,7 +899,7 @@ gr7:    move.w  d1,d0
         andi.w  #$0100,d0       ;check to make sure
         bne     ILLEG
         lea     mMOVEQ,a0       ;load "MOVEQ"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         bsr     pound
         bsr     dollar
@@ -917,7 +917,7 @@ gr8:    move.w  d1,d0
         cmpi.w  #$0100,d0       ;is it SBCD?
         bne     DIVS
         lea     mSBCD,a0        ;load "SBCD"
-xBCD:   bsr     writs           ;write it
+xBCD:   bsr     Out_Puts           ;write it
         move.w  d1,d0
         andi.w  #$0008,d0       ;mask reg/memory bit
         beq     sbcdrg          ;reg to reg op
@@ -956,10 +956,10 @@ DIVS:   move.w  d1,d0
         andi.w  #$0100,d0       ;mask the sign bit
         beq     DIVU            ;it's unsigned divide
         lea     mDIVS,a0        ;load "DIVS"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     divprt          ;go decode the rest of the command
 DIVU:   lea     mDIVU,a0        ;load "DIVU"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
 divprt: bsr     spc
         move.w  d1,d0
         bsr     writea
@@ -971,7 +971,7 @@ divprt: bsr     spc
         bra     disend
 
 OR:     lea     mOR,a0          ;load "OR"
-ANDent: bsr     writs           ;write it
+ANDent: bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         bsr     findsiz         ;print operand size
@@ -997,7 +997,7 @@ ordreg: move.w  d1,d0
         bra     disend
 
 gr9:    lea     mSUB,a0         ;load "SUB"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
 ax:     move.w  d1,d0
         andi.w  #$00c0,d0       ;mask the size bits
         cmpi.w  #$00c0,d0       ;is it ADDA or SUBA?
@@ -1095,7 +1095,7 @@ grb:    move.w  d1,d0
         cmpi.w  #$00c0,d0       ;size = 11 ?
         bne     CMP             ;no.
         lea     mCMPA,a0        ;yes, so load "CMPA"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         andi.w  #$0100,d0       ;mask CMPA size bit
@@ -1120,7 +1120,7 @@ CMP:    move.w  d1,d0
         andi.w  #$0100,d0       ;mask CMP/CMPM bit
         bne     CMPM            ;if nonzero, it's CMPM
         lea     mCMP,a0         ;load "CMP"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         bsr     findsiz         ;write size of operand
@@ -1138,7 +1138,7 @@ CMPM:   move.w  d1,d0
         cmpi.w  #$0008,d0       ;is it address reg mode?
         bne     EOR             ;if not, it's an EOR
         lea     mCMPM,a0        ;load "CMPM"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         bsr     findsiz         ;write the operand size
@@ -1159,7 +1159,7 @@ CMPM:   move.w  d1,d0
         bsr     plus
         bra     disend
 EOR:    lea     mEOR,a0         ;load "EOR"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     dot
         move.w  d1,d0
         bsr     findsiz         ;write operand size
@@ -1187,17 +1187,17 @@ MULS:   move.w  d1,d0
         andi.w  #$0100,d0       ;mask the sign bit
         beq     MULU            ;it's unsigned multiply
         lea     mMULS,a0        ;load "MULS"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     divprt          ;go decode the rest of the command
 MULU:   lea     mMULU,a0        ;load "MULU"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bra     divprt          ;go decode the rest of the command
 EXG:    move.w  d1,d0
         andi.w  #$0130,d0       ;mask for EXG
         cmpi.w  #$0100,d0       ;is it EXG?
         bne     AND             ;no.
         lea     mEXG,a0         ;yes, print
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     spc
         move.w  d1,d0
         andi.w  #$00f8,d0       ;mask op-mode bits
@@ -1238,7 +1238,7 @@ AND:    lea     mAND,a0         ;load "AND"
         bra     ANDent          ;go write the operation
 
 grd:    lea     mADD,a0         ;load "ADD"
-        bsr     writs           ;write it, then find out which ADD
+        bsr     Out_Puts           ;write it, then find out which ADD
         bra     ax              ;go find out which ADD it is
 
 gre:    move.w  d1,d0
@@ -1263,7 +1263,7 @@ ROX:    cmpi.w  #$0010,d0       ;is it ROX?
         lea     mROX,a0         ;yes, so load "ROX"
         bra     lr
 RO:     lea     mRO,a0          ;load "RO"
-lr:     bsr     writs           ;write the operation
+lr:     bsr     Out_Puts           ;write the operation
         move.w  d1,d0
         andi.w  #$0100,d0       ;mask the direction bit
         bne     lsh             ;left shift if bit set
@@ -1563,7 +1563,7 @@ m72:    cmpi.b  #$02,d0         ;is it relative w/ displacement?
         bsr     OutHex_Word           ;write it
         bsr     lparen
         lea     mPC,a0          ;load "PC"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     rparen
         bra     eaout
 m73:    cmpi.b  #$03,d0         ;is it relative w/ index?
@@ -1573,7 +1573,7 @@ m73:    cmpi.b  #$03,d0         ;is it relative w/ index?
         bsr     OutHex_Byte           ;write the 8 bit displacement
         bsr     lparen
         lea     mPC,a0          ;load "PC"
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
         bsr     comma
         bra     m6ad            ;go to reg. indir. routine to finish
 m74:    cmpi.b  #$04,d0         ;is it immediate?
@@ -1595,7 +1595,7 @@ m74l:   move.l  (a1)+,d0        ;load long immediate data
         bsr     OutHex_Long           ;write long data
         bra     eaout
 m75:    lea     mIAM,a0         ;load illegal mode message
-        bsr     writs           ;write it
+        bsr     Out_Puts           ;write it
 eaout:  rts
 
 wdis:   swap    d0              ;save opcode in upper 16 so we can

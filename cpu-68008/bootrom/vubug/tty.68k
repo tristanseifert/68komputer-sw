@@ -8,39 +8,14 @@
 ;
 Out_Putc:
 writ:
-  btst    #0, (ctrls)             ; Is ctrl-s active
+  btst    #0, (MC68681_A_Flow)             ; Is ctrl-s active
   beq     .doWrite                ; no, so write character
 
   stop    #$2000                  ; yes, wait until next int
-  bra     writ                    ; when awakened check again
+  bra     Out_Putc                ; when awakened check again
 
 .doWrite:
-  ; read the status register, check TXRDY bit (2), loop while clear
-  ; move.b  (MC68681_Base+MC68681_R_SRA), d0
-  btst    #2, (MC68681_Base+MC68681_R_SRA)
-  beq     .doWrite
-
-
-  ; write character to DUART
-  move.b  d0,(MC68681_Base+MC68681_W_THRA)
-
-  ; done!
-  rts
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Generalized write facility writes 1 byte
-; passed in d0 to serial port (UART B)
-;
-writu:
-.waitTxRdy:
-  ; wait for TXRDY
-  btst    #2, (MC68681_Base+MC68681_R_SRB)
-  beq.s   .waitTxRdy
-
-  ; write character to DUART
-  move.b  d0, (MC68681_Base+MC68681_W_THRB)
-  rts
+  bra     MC68681_Putch_A
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -48,14 +23,13 @@ writu:
 ; must terminate in a null (goes to UART A/tty)
 ;
 Out_Puts:
-writs:
   ; get character of string, exit if null
   move.b  (a0)+, d0                ;a0 is address of string
   beq     .end
 
   ; write the char and check the next one
-  bsr     writ
-  bra     writs
+  bsr     Out_Putc
+  bra     Out_Puts
 
 .end:
   rts
@@ -143,7 +117,7 @@ OutHex:
 
   ; then, write that string to the terminal
   movea.l a6, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; restore regs
   movem.l (sp)+, d1-d2/a0/a6
@@ -156,7 +130,7 @@ OutHex:
 ;
 crlf:
   lea     .NewlineData, a0
-  bsr     writs
+  bsr     Out_Puts
   rts
 
 .NewlineData:
@@ -212,11 +186,11 @@ n1:
 ; Turns off echo: this will disable the cursor as well.
 Echo_Off:
   ; clear echo flag
-  bclr    #0, (echo)
+  bclr    #0, (MC68681_A_Echo)
 
   ; send "cursor off" sequence
   lea     .MsgCursorOff, a0
-  bra     writs
+  bra     Out_Puts
   rts
 
 .MsgCursorOff:
@@ -227,11 +201,11 @@ Echo_Off:
 ; Turns on echo: this enables the cursor as well.
 Echo_On:
   ; enable echo flag
-  bset    #0, (echo)
+  bset    #0, (MC68681_A_Echo)
 
   ; send the "cursor on" sequence
   lea     .MsgCursorOn, a0
-  bra     writs
+  bra     Out_Puts
   rts
 
 .MsgCursorOn:

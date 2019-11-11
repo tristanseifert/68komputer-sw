@@ -82,7 +82,18 @@ MC68681_R_STC               = $F
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RTC base
 RTC_Base                    = $028000
-RTC_Time_Reg                = RTC_Base
+RTC_Time_Reg                = RTC_Base+$7FF8
+
+RTC_DS1744_Year             = $7FFF
+RTC_DS1744_Month            = $7FFE
+RTC_DS1744_Date             = $7FFD
+RTC_DS1744_Day              = $7FFC
+RTC_DS1744_Hours            = $7FFB
+RTC_DS1744_Minutes          = $7FFA
+RTC_DS1744_Seconds          = $7FF9
+RTC_DS1744_Century          = $7FF8
+
+RTC_DS1744_Command          = RTC_DS1744_Century
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; loader configuration

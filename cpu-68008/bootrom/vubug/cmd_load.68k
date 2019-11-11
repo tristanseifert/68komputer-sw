@@ -70,10 +70,10 @@ Cmd_Load:
 
   ; write a starting message and <cr>
   lea     .MsgLoadStart, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; move.b  #$0d, d0
-  ; bsr     writu
+  ; bsr     MC68681_Putch_B
 
   ; we're going to use the host port load routine
   lea     Load_UartRx, a0
@@ -85,7 +85,7 @@ Cmd_Load:
   move.l  d0, (Load_BaseAddr)
 
   lea     .MsgLoadAddr, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  (Load_BaseAddr), d0
   bsr     OutHex_Long
 
@@ -100,7 +100,7 @@ Cmd_Load:
   move.l  d0, (Load_ReceivedChecksum)
 
   lea     .MsgLoadCheck, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  (Load_ReceivedChecksum), d0
   bsr     OutHex_Long
 
@@ -115,13 +115,13 @@ Cmd_Load:
   move.l  d0, (Load_TotalLength)
 
   lea     .MsgLoadLen, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  (Load_TotalLength), d0
   bsr     OutHex_Long
 
   ; Print the "Remaining bytes" message
   lea     .MsgLoadRemaining, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  (Load_TotalLength), d0
   bsr     OutHex_Long
 
@@ -163,7 +163,7 @@ Cmd_Load:
 
   ; update remaining bytes counter
   lea     .MsgBackspace8, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  d7, d0
   bsr     OutHex_Long
 
@@ -180,7 +180,7 @@ Cmd_Load:
   move.l  d6, (Load_LocalChecksum)
 
   lea     .MsgLocalChecksum, a0
-  bsr     writs
+  bsr     Out_Puts
   move.l  d6, d0
   bsr     OutHex_Long
 
@@ -191,7 +191,7 @@ Cmd_Load:
   ; the checksum validation failed, print a message
 .ChecksumError:
   lea     .MsgChecksumFailed, a0
-  bsr     writs
+  bsr     Out_Puts
 
   ; then clear the go-after-load flag and exit
   sf.b    (Load_RunAfterLoad)
@@ -220,7 +220,7 @@ Cmd_Load:
 
   ; send the "load done" message
   lea     .MsgLoadDone, a0
-  bsr     writs
+  bsr     Out_Puts
 
 .Exit:
   ; restore UART B settings
@@ -243,13 +243,13 @@ Cmd_Load:
 
   ; write the user PC
   lea     .MsgUserPC, a0
-  bsr     writs
+  bsr     Out_Puts
 
   move.l  (_pc), d0
   bsr     OutHex_Long
 
   ; lea     .MsgProgramDivider, a0
-  ; bsr     writs
+  ; bsr     Out_Puts
   bsr     crlf
   bsr     Out_Divider
   bsr     crlf

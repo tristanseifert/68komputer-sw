@@ -47,6 +47,7 @@ int clock_read(clock_t *clock) {
 
   // convert from BCD to binary
   if(ret == 0) {
+    clock->century = bcd_to_bin(clock->century);
     clock->year = bcd_to_bin(clock->year);
     clock->month = bcd_to_bin(clock->month);
     clock->day = bcd_to_bin(clock->day);
@@ -70,6 +71,7 @@ int clock_write(clock_t *clock) {
   if(clock == NULL) return -1;
 
   // convert the clock struct to BCD
+  clock->century = bin_to_bcd(clock->century);
   clock->year = bin_to_bcd(clock->year);
   clock->month = bin_to_bcd(clock->month);
   clock->day = bin_to_bcd(clock->day);

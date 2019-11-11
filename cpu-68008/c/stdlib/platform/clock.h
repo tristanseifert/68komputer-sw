@@ -11,6 +11,7 @@
  */
 typedef struct {
   // date component
+  uint8_t century;
   uint8_t year;
   uint8_t month;
   uint8_t day;
