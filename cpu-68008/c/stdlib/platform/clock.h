@@ -36,4 +36,10 @@ int clock_read(clock_t *clock);
  */
 int clock_write(clock_t *toWrite);
 
+/**
+ * Gets the value of the system tick counter. This is the number of 100ths of
+ * seconds since the system has been powered on.
+ */
+unsigned int clock_get_ticks();
+
 #endif

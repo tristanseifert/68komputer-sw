@@ -37,6 +37,8 @@ Svc_Table:
   dc.w    Svc_TtySetAttribs-Svc_Table
   ; 0F: Unpack with LZ4
   dc.w    Svc_Unpack_Lz4-Svc_Table
+  ; 10: Get tick count
+  dc.w    Svc_Get_Ticks-Svc_Table
 Svc_Table_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -449,4 +451,17 @@ Svc_Unpack_Lz4:
 
   ; the status is always success
   moveq   #0, d0
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 10 - Gets the value of the system timer, in 100ths of a second.
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   d0: Number read from the terminal
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Get_Ticks:
+  move.l  (Loader_Tick), d0
   rts

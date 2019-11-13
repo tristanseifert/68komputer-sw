@@ -100,3 +100,22 @@ int clock_write(clock_t *clock) {
 
   return ret;
 }
+
+
+/**
+ * Gets the value of the system tick counter. This is the number of 100ths of
+ * seconds since the system has been powered on.
+ */
+unsigned int clock_get_ticks() {
+  int ret = -1;
+  __asm__ __volatile__(
+    "\tmoveq #0x10, %%d0\n"
+    "\ttrap #1\n"
+    "\tmove.l %%d0, %0\n"
+    : "=m"(ret) /* return code */
+    : /* no inputs */
+    : "d0" /* clobber d0 */
+  );
+
+  return ret;
+}
