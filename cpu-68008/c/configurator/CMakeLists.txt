@@ -8,6 +8,14 @@ add_subdirectory(../stdlib stdlib)
 add_executable(configurator
   ${CMAKE_CURRENT_SOURCE_DIR}/../stdlib/platform/start.S
   main.c
+  ScreenMode.c
+  ScreenMode.h
+  TitleBar.c
+  TitleBar.h
+  MainScreen.c
+  MainScreen.h
+  StatusBar.c
+  StatusBar.h
 )
 
 target_include_directories(configurator PUBLIC ../stdlib/include)

@@ -251,15 +251,36 @@ Svc_Putc:
 ;   This call will block until a character arrives. Interrupts must be enabled
 ;   or the call will deadlock.
 ; INPUTS:
-;   None
+;   d1: If bit 0 is set, don't wait for a character.
 ; OUTPUTS:
 ;   d0: Received character
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Svc_Getc:
   movem.l d1/a1, -(sp)
 
+  ; load the queue for all
   lea     UART_A_Queue, a1
+
+  ; if b it 0 is set, jump to the nonblocking call
+  btst    #0, d1
+  bne     .Nonblocking
+
+  ; we can block, so jump to the 68681 handler
+.ReadChar:
   bsr     _MC68681_Getch
+
+  movem.l (sp)+, d1/a1
+  rts
+
+.Nonblocking:
+  ; is there a byte waiting in the buffer?
+  tst.b   UART_Queue_WritePtr(a1)
+  bne     .ReadChar ; if yes, read it
+
+  ; no byte available, exit
+
+.noByte:
+  moveq   #-1, d0
 
   movem.l (sp)+, d1/a1
   rts

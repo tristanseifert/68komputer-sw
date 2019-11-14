@@ -24,8 +24,6 @@ typedef struct {
   uint8_t msecs;
 } __attribute__((packed)) clock_t;
 
-
-
 /**
  * Attempts to read the clock into the provided struct.
  */

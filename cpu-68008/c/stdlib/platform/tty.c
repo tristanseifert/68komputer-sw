@@ -17,7 +17,7 @@ int tty_set_echo(bool enabled) {
 
   // use trap $e, attrib is in d1, return code in d0
   __asm__ __volatile__(
-    "\tmoveq #5, %%d0\n"
+    "\tmoveq #0x0e, %%d0\n"
     "\tmove.l %1, %%d1\n"
     "\ttrap #1\n"
     "\tmove.l %%d0, %0\n"

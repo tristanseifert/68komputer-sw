@@ -5,6 +5,19 @@
 #include <stdio.h>
 
 /**
+ * Names of the days of week
+ */
+const char* clock_day_names[7] = {
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+};
+
+/**
  * Helper function to convert an 8-bit BCD quantity
  */
 static inline uint8_t bcd_to_bin(uint8_t bcd) {

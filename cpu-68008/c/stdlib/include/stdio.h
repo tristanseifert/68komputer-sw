@@ -66,6 +66,7 @@ typedef struct __sFILE_fake FILE;
 /// Requires a definition of _putchar() for your platform
 int putchar(int c);
 int getchar();
+int getchar_nonblocking();
 
 int puts(const char*);
 

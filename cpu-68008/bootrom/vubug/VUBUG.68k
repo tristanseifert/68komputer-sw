@@ -158,6 +158,9 @@ nul     =       $00
 howdy:
   dc.w    csc
 
+  ; reset terminal attributes
+  dc.b    $1b, "[0m"
+
   ; set the ASCII character set as graphics set 0
   dc.b    $1b, "(B"
   ; set the "dec special graphics" as graphics set 1
