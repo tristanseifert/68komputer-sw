@@ -7,15 +7,18 @@
 #include "StatusBar.h"
 
 #include <platform/tty.h>
+#include <platform/sleep.h>
 
 static uint8_t currentScreen = 0;
 static uint8_t nextScreen = 0;
+
+static uint8_t run = 1;
 
 /**
  * Entry point for the configurator application.
  */
 int main() {
-  uint8_t run = 1;
+  run = 1;
 
   // set up the terminal (clear)
   puts("\033[2J");
@@ -38,6 +41,9 @@ int main() {
 
     // changing screen mode?
     if(currentScreen != nextScreen) {
+      // disable echo at this point
+      tty_set_echo(false);
+
       // call the "about to disappear" callback of the old screen
       if(gScreenModes[currentScreen].willDisappear != NULL) {
         gScreenModes[currentScreen].willDisappear();
@@ -51,11 +57,18 @@ int main() {
       }
 
       // we now clear from the first line down and re-init status bar
-      puts("\033[?25l\033[2;1H\033[J");
+      puts("\033[?25l\033[2;1H");
+
+      for(int i = 0; i < 22; i++) {
+        puts("\033[K\n");
+      }
+
       status_init();
 
       // call the "about to appear" callback of the new screen
       if(gScreenModes[currentScreen].willAppear != NULL) {
+        // move cursor to top left of user area
+        puts("\033[2;1H");
         gScreenModes[currentScreen].willAppear();
       }
     }
@@ -66,8 +79,25 @@ int main() {
   status_deinit();
 
   // lastly, clean up the terminal (clear + reset)
-  puts("\033[2J\033c");
+  puts("\033[2J\033[1;1H");
+  sleep_ms(200);
+
   tty_set_echo(true);
+  // puts("Configurator Version 1.0\r\n");
 
   return 0;
+}
+
+/**
+ * Changes the screen mode.
+ */
+void scr_set(uint8_t mode) {
+  nextScreen = mode;
+}
+
+/**
+ * Exit the program
+ */
+void scr_exit() {
+  run = 0;
 }

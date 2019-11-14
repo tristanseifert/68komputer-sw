@@ -205,9 +205,17 @@ ssrn:   dc.w    $2700           ;same w/o interrupts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; prompt to accept input at
 Msg_Prompt:
+  ; ; reset terminal attributes
+  ; dc.b    $1b, "[0m"
+  ; ; set the ASCII character set as graphics set 0
+  ; dc.b    $1b, "(B"
+  ; ; set the "dec special graphics" as graphics set 1
+  ; dc.b    $1b, ")0"
+
   dc.b    cr,lf
   dc.b    '!'
   dc.b    nul
+  even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; monitor entry
@@ -380,6 +388,8 @@ CommandTable:
   dc.l    Cmd_Disassemble
   dc.w    $4900           ;I - start basic interpreter
   dc.l    Cmd_StartBasic
+  dc.w    $4e00           ;N - load config program
+  dc.l    Cmd_StartConfig
 CommandTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -440,9 +450,12 @@ Cmd_StartBasic:
   bsr     Out_Puts
 
   ; load the app and st ore its address
-  lea     $00008008, a0
+  lea     $0000800C, a0
   bsr     App_Load
   move.l  a0, (_pc)
+
+  ; clear breakpoint flags
+  move.b  #0, (bkptf)
 
   ; print the address
   lea     .MsgLoadedTo, a0
@@ -464,6 +477,41 @@ Cmd_StartBasic:
 .MsgDecompressing:
   dc.b    cr, lf
   dc.b    "Decompressing BASIC...", cr, lf, nul
+.MsgLoadedTo:
+  dc.b    "Loaded to $", nul
+  even
+
+Cmd_StartConfig:
+  bsr     Echo_Off
+
+  ; print message
+  lea     .MsgDecompressing, a0
+  bsr     Out_Puts
+
+  ; load the app and st ore its address
+  lea     $00008020, a0
+  bsr     App_Load
+  move.l  a0, (_pc)
+
+  ; clear breakpoint flags
+  move.b  #0, (bkptf)
+
+  ; print the address
+  lea     .MsgLoadedTo, a0
+  bsr     Out_Puts
+
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+
+  bsr     crlf
+  bsr     Out_Divider
+  ; bsr     crlf
+
+  bra     Cmd_Go_RunProgram
+
+.MsgDecompressing:
+  dc.b    cr, lf
+  dc.b    "Decompressing configurator...", cr, lf, nul
 .MsgLoadedTo:
   dc.b    "Loaded to $", nul
   even

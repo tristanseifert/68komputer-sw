@@ -16,6 +16,8 @@ add_executable(configurator
   MainScreen.h
   StatusBar.c
   StatusBar.h
+  ClockScreen.c
+  ClockScreen.h
 )
 
 target_include_directories(configurator PUBLIC ../stdlib/include)

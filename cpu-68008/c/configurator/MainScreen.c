@@ -1,6 +1,8 @@
 #include "MainScreen.h"
-
+#include "ScreenMode.h"
 #include "StatusBar.h"
+
+#include "tty.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -27,6 +29,10 @@ static const status_bar_entry_t gStatusEntries[] = {
     .key = "F9",
     .title ="Defaults"
   },
+  {
+    .key = "F10",
+    .title ="Exit"
+  },
 };
 
 /**
@@ -47,23 +53,6 @@ static struct {
     uint8_t escapeLen;
 } gState;
 
-// recognized escape sequences
-const uint8_t  kEscF6[] = {0x31, 0x37, 0x7e};
-const uint8_t  kEscF7[] = {0x31, 0x38, 0x7e};
-const uint8_t  kEscF8[] = {0x31, 0x39, 0x7e};
-const uint8_t  kEscF9[] = {0x32, 0x30, 0x7e};
-const uint8_t kEscF10[] = {0x32, 0x31, 0x7e};
-const uint8_t kEscF11[] = {0x32, 0x33, 0x7e};
-const uint8_t kEscF12[] = {0x32, 0x34, 0x7e};
-const uint8_t kEscF13[] = {0x32, 0x35, 0x7e};
-const uint8_t kEscF14[] = {0x32, 0x36, 0x7e};
-const uint8_t kEscF15[] = {0x32, 0x38, 0x7e}; // help
-const uint8_t kEscF16[] = {0x32, 0x39, 0x7e}; // do
-const uint8_t kEscF17[] = {0x33, 0x31, 0x7e};
-const uint8_t kEscF18[] = {0x33, 0x32, 0x7e};
-const uint8_t kEscF19[] = {0x33, 0x33, 0x7e};
-const uint8_t kEscF20[] = {0x33, 0x34, 0x7e};
-
 
 
 /**
@@ -72,9 +61,6 @@ const uint8_t kEscF20[] = {0x33, 0x34, 0x7e};
 void scr_main_appear() {
   // clear state
   memset(&gState, 0, sizeof(gState));
-
-  // go cursor to top left of user area
-  puts("\033[2;1H");
 
   // print banner
   puts(""
@@ -129,7 +115,7 @@ void scr_main_poll() {
         if(gState.escapeLen == 3) {
           // F6? (clock settings)
           if(memcmp(&gState.escapeBuf, &kEscF6, 3) == 0) {
-
+            scr_set(2);
           }
           // F7? (serial settings)
           else if(memcmp(&gState.escapeBuf, &kEscF7, 3) == 0) {
@@ -142,6 +128,10 @@ void scr_main_poll() {
           // F9? (reset to defaults)
           else if(memcmp(&gState.escapeBuf, &kEscF9, 3) == 0) {
 
+          }
+          // F10? exit
+          else if(memcmp(&gState.escapeBuf, &kEscF10, 3) == 0) {
+            scr_exit();
           }
           // unknown escape sequence
           else {

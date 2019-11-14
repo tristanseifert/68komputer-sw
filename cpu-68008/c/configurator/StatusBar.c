@@ -29,13 +29,13 @@ void status_init() {
   memset(&gState, 0, sizeof(gState));
 
   // draw the status bar (background)
-  puts("\033[24;1H\033[7m");
+  puts("\0337\033[24;1H\033[7m");
 
   for(uint8_t i = 0; i < 80; i++) {
     puts(" ");
   }
 
-  puts("\033[0m");
+  puts("\033[0m\0338");
 }
 
 /**
@@ -61,7 +61,7 @@ void status_poll() {
  */
 static void status_bar_draw() {
   // go to (2, 24)
-  puts("\033[24;2H");
+  puts("\0337\033[24;2H");
 
   // draw each of the entries
   for(uint8_t i = 0; i < gState.numEntries; i++) {
@@ -70,6 +70,9 @@ static void status_bar_draw() {
     // draw this entry
     printf("\033[0m%s\033[7m%s ", entry->key, entry->title);
   }
+
+  // restore cursor position
+  puts("\0338");
 
   // no longer dirty :)
   gState.barDirty = false;

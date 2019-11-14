@@ -145,6 +145,8 @@ HelpTable:
   dc.w    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
   dc.w    $4900           ;b - basic interpreter
   dc.w    HelpText_MsgHeader_Basic, HelpText_MsgText_Basic
+  dc.w    $4e00           ;n - configurator
+  dc.w    HelpText_MsgHeader_Config, HelpText_MsgText_Config
 HelpTable_End:
 
 
@@ -310,5 +312,17 @@ HelpText_MsgText_Basic:
   Help_Text_Description "Invoke BASIC as follows:"
   Help_Text_Command "i", "Jumps to the interpreter"
   Help_Text_Description "\r\n    Return to the monitor by sending Ctrl+D on UART A."
+  dc.b    nul
+  even
+
+
+; Config: Start the configurator
+HelpText_MsgHeader_Config:
+  Help_Text_Header "N", "Invoke the configurator"
+  dc.b    nul
+
+HelpText_MsgText_Config:
+  Help_Text_Description "Invoke the configurator as follows:"
+  Help_Text_Command "n", "Runs the configurator"
   dc.b    nul
   even

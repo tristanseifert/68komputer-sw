@@ -10,6 +10,7 @@
 ; Application directory
 App_Dir:
   dc.l    App_Basic
+  dc.l    App_Config
   dc.l    0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -25,6 +26,20 @@ App_Basic:
   ; run address
   dc.l    RAM_LZ4_App_Base
 
+App_Config:
+  dc.b    "BLAZ"
+  dc.b    $80, 0, 0, 0
+
+  ; source data, dest address
+  dc.l    App_Config_Data, $00082000
+  ; run address
+  dc.l    $00082000
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 App_Basic_Data:
   incbin  "ebasic.bin.lz4"
+  even
+
+App_Config_Data:
+  incbin  "config.bin.lz4"
   even

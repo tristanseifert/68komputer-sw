@@ -24,4 +24,14 @@ typedef struct {
 // screen modes list
 extern const screen_mode_t gScreenModes[];
 
+/**
+ * Changes the screen mode.
+ */
+void scr_set(uint8_t mode);
+
+/**
+ * Exit the program
+ */
+void scr_exit();
+
 #endif

@@ -53,13 +53,13 @@ void title_init() {
   gState.outputFullClock = true;
 
   // draw the title bar (background)
-  puts("\033[1;1H\033[7m");
+  puts("\0337\033[1;1H\033[7m");
 
   for(uint8_t i = 0; i < 80; i++) {
     puts(" ");
   }
 
-  puts("\033[0m");
+  puts("\033[0m\0338");
 }
 /**
  * Cleans up the title bar state.
@@ -86,7 +86,7 @@ void title_poll() {
   // do we need to update the title?
   if(gState.titleDirty) {
     // go to the position and draw the title
-    printf("\033[1;1H\033[7m %.32s", gState.title);
+    printf("\0337\033[1;1H\033[7m %-32s\033[0m\0338", gState.title);
 
     // title no longer dirty :)
     gState.titleDirty = false;
@@ -102,6 +102,9 @@ void title_set(const char *title) {
   // copy as much as we can
   strncpy(gState.title, title, sizeof(gState.title));
   gState.titleDirty = true;
+
+  // force a full clock redraw
+  gState.outputFullClock = true;
 }
 
 
@@ -124,12 +127,12 @@ static void title_clock_draw() {
 
   // update the full line if minutes are zero or requested
   if(clock.minutes == 0 || gState.outputFullClock) {
-    printf("\033[1;57H\033[7m%s %02u-%02u-%02u%02u %02u%c%02u%c%02u\033[0m", dayName, clock.day, clock.month, clock.century, clock.year, clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
+    printf("\0337\033[1;57H\033[7m%s %02u-%02u-%02u%02u %02u%c%02u%c%02u\033[0m\0338", dayName, clock.day, clock.month, clock.century, clock.year, clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
 
     gState.outputFullClock = false;
   }
   // just update the time otherwise
   else {
-    printf("\033[1;72H\033[7m%02u%c%02u%c%02u\033[0m", clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
+    printf("\0337\033[1;72H\033[7m%02u%c%02u%c%02u\033[0m\0338", clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
   }
 }
