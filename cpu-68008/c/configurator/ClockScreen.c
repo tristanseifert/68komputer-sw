@@ -14,6 +14,20 @@
 #include <platform/tty.h>
 #include <platform/clock.h>
 
+
+/**
+ * Names of the days of the week
+ */
+static const char* gDayNames[] = {
+ "Sunday",
+ "Monday",
+ "Tuesday",
+ "Wednesday",
+ "Thursday",
+ "Friday",
+ "Saturday",
+};
+
 /**
  * Status bar keys
  */
@@ -103,7 +117,7 @@ void scr_clock_appear() {
   prepare_line();
 
   // print directions
-  puts("");
+  puts("Use TAB to move between fields. Day-of-week will update automatically.\r\n");
 
   // print the form
   puts(
@@ -165,6 +179,9 @@ void scr_clock_poll() {
           if(gState.lineBufOffset) {
             gState.lineBufOffset--;
             gState.lineBuf[gState.lineBufOffset] = '\0';
+
+            // move the cursor back a position
+            puts("\b");
           }
 
           gState.lineBufDirty = true;
@@ -175,8 +192,12 @@ void scr_clock_poll() {
           gState.lineBuf[gState.lineBufOffset] = key;
 
           // store at the next offset if we're not already at the end of array
-          if(gState.lineBufOffset <= 3) {
+          if(gState.lineBufOffset < 1) {
             gState.lineBufOffset++;
+          }
+          // if we are, move the cursor back
+          else {
+            puts("\b");
           }
 
           gState.lineBufDirty = true;
@@ -248,7 +269,7 @@ void scr_clock_disappear() {
  */
 static void update_cursor() {
   // set the appropriate position
-  printf("\033[%d;10H", (gState.formRow + 4));
+  printf("\033[%d;10H", (gState.formRow + 5));
   gState.cursorDirty = false;
 
   // re-enable echo
@@ -261,14 +282,19 @@ static void update_cursor() {
 static void draw_form_values() {
   tty_set_echo(false);
 
+  // output the numeric values
   for(int i = 0; i < 6; i++) {
-    printf("\033[%d;10H%2d", (i + 4), gState.values[i]);
+    printf("\033[%d;10H%2d", (i + 5), gState.values[i]);
   }
 
-  tty_set_echo(true);
+  // then print the day-of-week
+  int day = get_day_of_week(gState.values[2], gState.values[1], gState.values[0]);
+  printf("\033[7;13H (%s)    ", gDayNames[day & 0x07]);
 
   // form is no longer dirty
   gState.formValuesDirty = false;
+
+  tty_set_echo(true);
 }
 
 /**

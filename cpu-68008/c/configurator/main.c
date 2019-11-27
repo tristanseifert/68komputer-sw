@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "ScreenMode.h"
@@ -11,6 +12,7 @@
 
 static uint8_t currentScreen = 0;
 static uint8_t nextScreen = 0;
+static bool forceRedraw = false;
 
 static uint8_t run = 1;
 
@@ -30,6 +32,7 @@ int main() {
 
   // set up for the home screen
   nextScreen = 1;
+  forceRedraw = false;
 
   // this is our main input loop
   while(run) {
@@ -40,7 +43,7 @@ int main() {
     gScreenModes[currentScreen].poll();
 
     // changing screen mode?
-    if(currentScreen != nextScreen) {
+    if(currentScreen != nextScreen || forceRedraw) {
       // disable echo at this point
       tty_set_echo(false);
 
@@ -51,6 +54,7 @@ int main() {
 
       // update the screen mode value and titlebar title
       currentScreen = nextScreen;
+      forceRedraw = false;
 
       if(gScreenModes[currentScreen].title != NULL) {
         title_set(gScreenModes[currentScreen].title);

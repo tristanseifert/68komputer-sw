@@ -123,16 +123,16 @@ static void title_clock_draw() {
 
   // prepare for output
   const char *dayName = gDayShortNames[clock.dayOfWeek & 7];
-  char timeSep = ((clock.seconds & 0x01) == 0) ? ':' : ' ';
+  char timeSep = ((clock.seconds & 0x01)) ? ':' : ' ';
 
   // update the full line if minutes are zero or requested
   if(clock.minutes == 0 || gState.outputFullClock) {
-    printf("\0337\033[1;57H\033[7m%s %02u-%02u-%02u%02u %02u%c%02u%c%02u\033[0m\0338", dayName, clock.day, clock.month, clock.century, clock.year, clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
+    printf("\0337\033[1;57H\033[7m%s %02u-%02u-%02u%02u %02u%c%02u%c%02u \033[0m\0338", dayName, clock.day, clock.month, clock.century, clock.year, clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
 
     gState.outputFullClock = false;
   }
   // just update the time otherwise
   else {
-    printf("\0337\033[1;72H\033[7m%02u%c%02u%c%02u\033[0m\0338", clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
+    printf("\0337\033[1;72H\033[7m%02u%c%02u%c%02u \033[0m\0338", clock.hours, timeSep, clock.minutes, timeSep, clock.seconds);
   }
 }

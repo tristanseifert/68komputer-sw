@@ -19,7 +19,7 @@ static struct {
 
 
 static void status_bar_draw();
-
+static void bar_draw_bg();
 
 /**
  * Initializes the status bar.
@@ -28,14 +28,7 @@ void status_init() {
   // clear internal state
   memset(&gState, 0, sizeof(gState));
 
-  // draw the status bar (background)
-  puts("\0337\033[24;1H\033[7m");
-
-  for(uint8_t i = 0; i < 80; i++) {
-    puts(" ");
-  }
-
-  puts("\033[0m\0338");
+  bar_draw_bg();
 }
 
 /**
@@ -60,6 +53,9 @@ void status_poll() {
  * Draws the status bar
  */
 static void status_bar_draw() {
+  // clear bar background
+  bar_draw_bg();
+
   // go to (2, 24)
   puts("\0337\033[24;2H");
 
@@ -96,4 +92,18 @@ int status_set(uint8_t num, const status_bar_entry_t *entries) {
 
   // mark bar as dirty
   gState.barDirty = true;
+}
+
+/**
+ * Draws the background of the status bar
+ */
+static void bar_draw_bg() {
+  // draw the status bar (background)
+  puts("\0337\033[24;1H\033[7m");
+
+  for(uint8_t i = 0; i < 80; i++) {
+    puts(" ");
+  }
+
+  puts("\033[0m\0338");
 }
