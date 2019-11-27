@@ -13,3 +13,6 @@
 [submodule "cpu-68008/c/stdlib/platform/umm_malloc"]
 	path = cpu-68008/c/stdlib/platform/umm_malloc
 	url = git@github.com:rhempel/umm_malloc.git
+[submodule "cpu-68000/bootrom/lz4-68k"]
+	path = cpu-68000/bootrom/lz4-68k
+	url = https://github.com/arnaud-carre/lz4-68k.git

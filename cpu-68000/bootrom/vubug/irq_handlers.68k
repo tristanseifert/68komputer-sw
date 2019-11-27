@@ -7,45 +7,18 @@ RAM_Vector_Init:
   move    sr, -(sp)
   move    #$2700, sr
 
-  ; first, reset each vector to rte
-  lea     RAM_Vector_Irq_Uninitialized, a0
-  moveq   #((RAM_Vectors_End-RAM_Vectors_Start)/16)-1, d0
+  ; copy the vector table to the base of RAM
+  lea     ROM_VTable_Start, a0
+  lea     RAM_VTable_Start, a1
+  moveq   #((ROM_VTable_End-ROM_VTable_Start)/4)-1, d0
 
-  move.l  #$4E734E71, d1 ; rte/nop
-  move.l  #$4E714E71, d2 ; nop/nop
-
-.ClearLoop:
-  move.l  d1, (a0)+
-  move.l  d2, (a0)+
-  move.l  d2, (a0)+
-  move.l  d2, (a0)
-  dbf     d0, .ClearLoop
-
-  ; install our 68681 vector
-  lea     RAM_Vector_Irq2, a0
-  move.w  #$4EF9, (a0)+
-  move.l  #MC68681_ISR, (a0)+
-
-  ; install the trap 0 (exit) handler
-  lea     RAM_Vector_Trap0, a0
-  move.w  #$4EF9, (a0)+
-  move.l  #Svc_Exit_Trap, (a0)
-
-  ; install the trap 1 (loader services) handler
-  lea     RAM_Vector_Trap1, a0
-  move.w  #$4EF9, (a0)+
-  move.l  #Svc_Entry_Trap, (a0)
+.CopyVTable:
+  move.l  (a0)+, (a1)+
+  dbf     d0, .CopyVTable
 
   ; we've finished, re-enable interrupts
   move    (sp)+, sr
   rts
-
-.Jmp:
-  jmp     $12345678
-.Jsr:
-  jsr     $12345678
-.Nop:
-  nop
 
 ; reserved exception handler, should never actually get called
 .Rte:
@@ -310,3 +283,71 @@ Svc_Exit_Trap:
 .MsgExit:
   dc.b    cr, lf, $E, $60, $F, " Return to monitor", cr, lf, nul
   even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Unused (default, e.g. not changed by the application) trap
+Trap_Unused:
+  movem.l d0-d1/a0, -(sp)
+
+  ; TODO: display an error message
+  lea     .MsgUnusedTrap, a0
+  bsr     Out_Puts
+  ; move.l  (_pc), d0
+  ; bsr     OutHex_Long
+
+  movem.l (sp)+, d0-d1/a0
+  rte
+
+.MsgUnusedTrap:
+  dc.b    cr, lf, $7, "Uninitialized trap: $", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Unused (default, e.g. not changed by application) interrupt
+Irq_Unused:
+  movem.l d0-d1/a0, -(sp)
+
+  ; TODO: display an error message WITH the irq number
+  lea     .MsgUnusedIrq, a0
+  bsr     Out_Puts
+  ; move.l  (_pc), d0
+  ; bsr     OutHex_Long
+
+  movem.l (sp)+, d0-d1/a0
+  rte
+
+.MsgUnusedIrq:
+  dc.b    cr, lf, $7, "Unused interrupt: $", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Spurious interrupt
+Irq_Uninitialized:
+Irq_Spurious:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  ; the status and PC are deeper in the stack for an address or bus error
+  move.w  $8(a7), (_sr)
+  move.l  $a(a7), (_pc)
+  ; otherwise, continue as normal
+  pea     comm
+  move.w  ssri, -(a7)
+
+  ; print a message
+  lea     .MsgSpurious, a0
+  bsr     Out_Puts
+
+  ; return into the command interpreter
+  rte
+
+.MsgSpurious:
+  dc.b    cr, lf, $7, "Spurious interrupt", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; NMI handler: drops you to the monitor prompt
+Irq_Nmi:
+  bra     VUBUG_Restart
+  rte

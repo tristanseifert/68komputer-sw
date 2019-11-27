@@ -153,11 +153,11 @@ Cmd_MemUpdate:
   bsr     getch
 
   ; search the command table
-  moveq   #((.CmdTable_End-.CmdTable)/4)-1, d2
-  lea     .CmdTable-4, a0
+  moveq   #((.CmdTable_End-.CmdTable)/6)-1, d2
+  lea     .CmdTable-6, a0
 
 .SearchTable:
-  addq.l  #$4, a0
+  addq.l  #6, a0
 
   ; check character and continue looping if not
   cmp.b   (a0), d0
@@ -166,7 +166,7 @@ Cmd_MemUpdate:
   bne     .Exit
 
   ; get address of routine and jump to it
-  movea.w $2(a0), a0
+  movea.l $2(a0), a0
   jsr     (a0)
   bra     .Prompt
 
@@ -225,17 +225,17 @@ Cmd_MemUpdate:
 ; command table for memory mode
 .CmdTable:
   dc.w    $2e00           ;.
-  dc.w    .SetExamPtr
+  dc.l    .SetExamPtr
   dc.w    $3d00           ;=
-  dc.w    .SetData
+  dc.l    .SetData
   dc.w    $2c00           ;,
-  dc.w    .IncrementAndSet
+  dc.l    .IncrementAndSet
   dc.w    $2b00           ;+
-  dc.w    .IncrementPtr
+  dc.l    .IncrementPtr
   dc.w    $2d00           ;-
-  dc.w    .DecrementPtr
+  dc.l    .DecrementPtr
   dc.w    $0d00           ;<CR>
-  dc.w    .PrintCurrentData
+  dc.l    .PrintCurrentData
 .CmdTable_End:
   even
 

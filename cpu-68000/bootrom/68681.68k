@@ -100,15 +100,18 @@ MC68681_Reset_Data:
   dc.b    MC68681_W_CRB, %11010000 ; set active mode
   dc.b    MC68681_W_CRB, %00000101 ; enable tx/rx
 
-  ; configure output port: OP3 = STATUS0, OP7 = STATUS1
+  ; configure output port
+  ; STATUS0 = OP5, STATUS1 = OP7, STATUS2 = OP3, REMAP = OP2, !EXT_ID = OP6
+  ; !A_RTS = OP0, !B_RTS = OP1
   dc.b    MC68681_W_OPCR, %00000000
 
-  ; clear all outputs except
-  dc.b    MC68681_W_SOPBC, %11101111
-  dc.b    MC68681_W_COPBC, %00000000
+  ; set status LEDs off (low); deassert REMAP; ensure RTS for both channels is low
+  dc.b    MC68681_W_SOPBC, %10101100
+  ; deassert !EXT_ID (high)
+  dc.b    MC68681_W_COPBC, %01000000
 
-  ; vector
-  dc.b    MC68681_W_IVR, 26
+  ; vector (not used, we use autovectoring)
+  ; dc.b    MC68681_W_IVR, 26
 
   ; configure interrupts: break change A, counter ready
   dc.b    MC68681_W_IMR, %00001100

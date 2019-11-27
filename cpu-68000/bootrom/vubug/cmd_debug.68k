@@ -24,11 +24,13 @@
 ;
 rtab:
   dc.w    $2e00           ;.
-  dc.w    rdot
+  dc.l    rdot
   dc.w    $3d00           ;=
-  dc.w    requ
+  dc.l    requ
   dc.w    $0d00           ;<cr>
-  dc.w    rall
+  dc.l    rall
+  even
+
 rtab1:
   dc.w    $cb00           ;internal name/offset
   dc.b    "SR"                    ;print name
@@ -91,16 +93,23 @@ rplp:   lea     rmes,a0                 ;say hello
 rlp:    lea     rprmp,a0                ;write register prompt
       bsr     Out_Puts
       bsr     getch                   ;get command
+
       moveq   #$2,d2                  ;set for search
-      lea     rtab-4,a0
-rmlp:   addq.l  #$4,a0                  ;search
-      cmp.b   (a0),d0
-      dbeq    d2,rmlp
-      bne     rexit                   ;exit if not found
-      movea.w $2(a0),a0               ;found it so go to it
-      jsr     (a0)
-      bra     rlp                     ;go again
-rexit:  rts
+      lea     rtab-6,a0
+.FindCmd:
+  addq.l  #6,a0                  ;search
+  cmp.b   (a0),d0
+  dbeq    d2, .FindCmd
+  bne     rexit                   ;exit if not found
+
+  movea.l $2(a0),a0               ;found it so go to it
+  jsr     (a0)
+  bra     rlp                     ;go again
+
+rexit:
+  rts
+
+
 rdot:   lea     getch,a0                ;set register pointer
       bsr     InHex_Byte
       bsr     raddr                   ;set input address

@@ -84,7 +84,9 @@ iloc    =       $0002
 ; herein as this will destroy the vector
 ; for iterrupts, breakpoints...
 ;
-  org     $0
+  org     $E00000
+
+ROM_VTable_Start:
   ; system stack and entry point
   dc.l    stack                 ;system stack
   dc.l    start                 ;initial pc
@@ -107,37 +109,38 @@ iloc    =       $0002
   ; some reserved vectors
   dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
   ; uninitialized interrupt
-  dc.l    RAM_Vector_Irq_Uninitialized
+  dc.l    Irq_Uninitialized
   ; more reserved vectors
   dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
   dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
   dc.l    Exception_Reserved, Exception_Reserved
   ; interrupts
-  dc.l    RAM_Vector_Irq_Spurious
-  dc.l    RAM_Vector_Irq1
-  dc.l    RAM_Vector_Irq2
-  dc.l    RAM_Vector_Irq3
-  dc.l    RAM_Vector_Irq4
-  dc.l    RAM_Vector_Irq5
-  dc.l    RAM_Vector_Irq6
-  dc.l    RAM_Vector_Irq7
+  dc.l    Irq_Spurious
+  dc.l    Irq_Unused
+  dc.l    MC68681_ISR
+  dc.l    Irq_Unused
+  dc.l    Irq_Unused
+  dc.l    Irq_Unused
+  dc.l    Irq_Unused
+  dc.l    Irq_Nmi
   ; trap vectors
-  dc.l    RAM_Vector_Trap0
-  dc.l    RAM_Vector_Trap1
-  dc.l    RAM_Vector_Trap2
-  dc.l    RAM_Vector_Trap3
-  dc.l    RAM_Vector_Trap4
-  dc.l    RAM_Vector_Trap5
-  dc.l    RAM_Vector_Trap6
-  dc.l    RAM_Vector_Trap7
-  dc.l    RAM_Vector_Trap8
-  dc.l    RAM_Vector_Trap9
-  dc.l    RAM_Vector_TrapA
-  dc.l    RAM_Vector_TrapB
-  dc.l    RAM_Vector_TrapC
-  dc.l    RAM_Vector_TrapD
-  dc.l    RAM_Vector_TrapE
-  dc.l    RAM_Vector_TrapF
+  dc.l    Svc_Exit_Trap
+  dc.l    Svc_Entry_Trap
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+  dc.l    Trap_Unused
+ROM_VTable_End:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;+++++++++++++++++++++++++++++++++++++++++
@@ -220,10 +223,16 @@ Msg_Prompt:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; monitor entry
 start:
-  ; set up hardware
   move    #$2700, sr
+
+  ; de-assert the REMAP signal and /EXT_ID
+  move.b  #%00000100, (MC68681_Base+MC68681_W_SOPBC)
+  move.b  #%01000000, (MC68681_Base+MC68681_W_COPBC)
+
+  ; set up vector table (copies it from ROM to RAM)
   bsr     RAM_Vector_Init
 
+  ; set up hardware
   bsr     MC68681_Reset
   bsr     MC68681_DisableRx
 
@@ -232,8 +241,6 @@ start:
   ; RXRDY_B, timer, break_A, RXRDY_A; then install our IRQ handler
   move.b  #%00101110, (MC68681_Base+MC68681_W_IMR)
 
-; set up buffers
-gwan:
   ; clear both of our receive buffers
   moveq   #0, d0
   move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
@@ -398,9 +405,6 @@ CommandTable_End:
 ; (com) and address of servicing routine
 ; (code)
 ;
-com     =       $0
-code    =       $2
-
 comm:
   ; display command prompt
   lea     Msg_Prompt, a0
@@ -422,14 +426,14 @@ clp:
   addq.w  #6, a2
 
   ; does the character match?
-  cmp.b   com(a2), d0
+  cmp.b   (a2), d0
   ; if not, check the next slot
   dbeq    d2, clp
   ; if it didn't match, we're at the end and couldn't find a command
   bne     .BadCommand
 
   ; get the address of the routine and jump to it
-  movea.l code(a2), a2
+  movea.l 2(a2), a2
   jsr     (a2)
   bra     comm
 
@@ -450,7 +454,7 @@ Cmd_StartBasic:
   bsr     Out_Puts
 
   ; load the app and st ore its address
-  lea     $0000800C, a0
+  lea     $00E0800C, a0
   bsr     App_Load
   move.l  a0, (_pc)
 
@@ -481,6 +485,8 @@ Cmd_StartBasic:
   dc.b    "Loaded to $", nul
   even
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Starts the configuration program
 Cmd_StartConfig:
   bsr     Echo_Off
 
@@ -488,8 +494,8 @@ Cmd_StartConfig:
   lea     .MsgDecompressing, a0
   bsr     Out_Puts
 
-  ; load the app and st ore its address
-  lea     $00008020, a0
+  ; load the app and store its address
+  lea     $00E08020, a0
   bsr     App_Load
   move.l  a0, (_pc)
 
@@ -528,10 +534,6 @@ Cmd_StartConfig:
   include "cmd_listing.68k"
 ; help system
   include "cmd_help.68k"
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; library routines
-  include "lib.68k"
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; LZ4 decompression (supports compressed apps in ROM)
@@ -601,6 +603,11 @@ Loader_Handle_Tick:
 ;
 ; RAM Base address
   org     RAM_Monitor
+
+; vector table shadow are (will be at physical address $0)
+RAM_VTable_Start:
+  dcb.l   128, 0
+RAM_VTable_End:
 
 ; system stack (512 bytes)
 sarea:  dcb.w   512,0
@@ -706,65 +713,6 @@ Load_LocalChecksum:
 Load_RunAfterLoad:
   dc.b    0
 
-  even
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; RAM vectors
-RAM_Vectors_Start:
-
-RAM_Vector_Irq_Uninitialized:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq_Spurious:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq1:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq2: ; DUART
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq3:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq4:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq5:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq6:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Irq7: ; nmi
-  dc.l    0, 0, 0, 0
-
-RAM_Vector_Trap0:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap1:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap2:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap3:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap4:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap5:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap6:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap7:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap8:
-  dc.l    0, 0, 0, 0
-RAM_Vector_Trap9:
-  dc.l    0, 0, 0, 0
-RAM_Vector_TrapA:
-  dc.l    0, 0, 0, 0
-RAM_Vector_TrapB:
-  dc.l    0, 0, 0, 0
-RAM_Vector_TrapC:
-  dc.l    0, 0, 0, 0
-RAM_Vector_TrapD:
-  dc.l    0, 0, 0, 0
-RAM_Vector_TrapE:
-  dc.l    0, 0, 0, 0
-RAM_Vector_TrapF:
-  dc.l    0, 0, 0, 0
-
-RAM_Vectors_End:
   even
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

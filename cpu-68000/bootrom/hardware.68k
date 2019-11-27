@@ -2,13 +2,13 @@
 ; various equates for 68komputer hardware
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; ROM base (bootloader address)
-ROM_Base                    = $000000
+ROM_Base                    = $E00000
 ; Application ROM starting location
-ROM_App_Base                = $008000
+ROM_App_Base                = $E10000
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; 68681 base
-MC68681_Base                = $020000
+MC68681_Base                = $FF0000
 
 ; WRITE: channel A mode register
 MC68681_W_MRnA              = $0
@@ -81,7 +81,7 @@ MC68681_R_STC               = $F
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RTC base
-RTC_Base                    = $028000
+RTC_Base                    = $FF8000
 RTC_Time_Reg                = RTC_Base+$7FF8
 
 RTC_DS1744_Year             = $7FFF
@@ -103,21 +103,11 @@ NVRAM_Loader_AppAddr        = (NVRAM_Loader_Mode+$2)
 ; start of application defined NVRAM space
 NVRAM_App_Base              = (NVRAM_Loader_Base+$100)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; option ROMs on bus
-Bus_Option_Rom_Base         = $030000
-Bus_Option_Rom_Size         = $008000
-; bus configuration registers
-Bus_Config_Base             = $038000
-Bus_Config_Size             = $008000
-; bus peripheral region (64K per card)
-Bus_Periph_Base             = $040000
-Bus_Periph_Size             = $040000
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; RAM base and size
-RAM_Base                    = $080000
-RAM_Size                    = $080000
+RAM_Base                    = $000000
+RAM_Size                    = $100000
 
 ; base address for monitor (2KBytes reserved)
 RAM_Monitor                 = (RAM_Base)

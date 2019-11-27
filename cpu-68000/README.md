@@ -5,3 +5,4 @@ In this directory you will find basically all software needed for the 68000-base
   - ebasic: Enhanced BASIC interpreter
 - c: Apps written in C
   - configurator: ROM-based setup program
+- tools: Utilities to work with the boot ROM, apps, and other platform-specific things

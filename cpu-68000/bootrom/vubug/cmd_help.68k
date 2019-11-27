@@ -62,24 +62,24 @@ Cmd_Help:
 .PrintAllTopics:
   bsr     crlf
   ; bsr     crlf
-  moveq   #((HelpTable_End-HelpTable)/6)-1, d1
+  moveq   #((HelpTable_End-HelpTable)/10)-1, d1
   lea     HelpTable+2, a1
   move.l  a1, a0
 
 .PrintTopicLoop:
   ; print that short help message
-  movea.w (a1), a0
+  movea.l (a1), a0
   bsr     Out_Puts
 
   ; check the next one
-  addq.w  #6, a1
+  add.w   #10, a1
   dbf     d1, .PrintTopicLoop
   rts
 
 .GetTopicHelp:
   ; Try to find the topic in the help table
   lea     HelpTable, a1
-  moveq   #((HelpTable_End-HelpTable)/6)-1, d1
+  moveq   #((HelpTable_End-HelpTable)/10)-1, d1
 
 .FindTopicHelp:
   ; is this the topic we're looking for?
@@ -87,7 +87,7 @@ Cmd_Help:
   beq     .PrintTopic
 
   ; go to the next entry in the table
-  addq.l  #6,a1
+  add.w   #10, a1
   dbf     d1, .FindTopicHelp
 
   ; no such topic, so print all of them
@@ -102,12 +102,12 @@ Cmd_Help:
 
   ; print the "short help" (e.g. the title)
   addq.l  #2, a1
-  movea.w (a1)+, a0
+  movea.l (a1)+, a0
   bsr     Out_Puts
 
   ; then, print the long help (e.g. description)
   ; bsr     crlf
-  movea.w (a1), a0
+  movea.l (a1), a0
   bra     Out_Puts
   ; rts
 
@@ -122,31 +122,31 @@ Cmd_Help:
 ; This table maps a character to the help header and detail text.
 HelpTable:
   dc.w    $4800           ;h - help
-  dc.w    HelpText_MsgHeader_Help, HelpText_MsgText_Help
+  dc.l    HelpText_MsgHeader_Help, HelpText_MsgText_Help
   dc.w    $4d00           ;m - memory
-  dc.w    HelpText_MsgHeader_Memory, HelpText_MsgText_Memory
+  dc.l    HelpText_MsgHeader_Memory, HelpText_MsgText_Memory
   dc.w    $4c00           ;l - load
-  dc.w    HelpText_MsgHeader_Load, HelpText_MsgDetail_Load
+  dc.l    HelpText_MsgHeader_Load, HelpText_MsgDetail_Load
   dc.w    $4400           ;d - dump
-  dc.w    HelpText_MsgHeader_Dump, HelpText_MsgText_Dump
+  dc.l    HelpText_MsgHeader_Dump, HelpText_MsgText_Dump
   dc.w    $5300           ;s - single step
-  dc.w    HelpText_MsgHeader_Step, HelpText_MsgText_Step
+  dc.l    HelpText_MsgHeader_Step, HelpText_MsgText_Step
   dc.w    $5400           ;t - trace program
-  dc.w    HelpText_MsgHeader_Trace, HelpText_MsgText_Trace
+  dc.l    HelpText_MsgHeader_Trace, HelpText_MsgText_Trace
   dc.w    $4700           ;g - start user program
-  dc.w    HelpText_MsgHeader_Go, HelpText_MsgText_Go
+  dc.l    HelpText_MsgHeader_Go, HelpText_MsgText_Go
   dc.w    $4200           ;b - breakpoints
-  dc.w    HelpText_MsgHeader_Breakpoint, HelpText_MsgText_Breakpoint
+  dc.l    HelpText_MsgHeader_Breakpoint, HelpText_MsgText_Breakpoint
   dc.w    $4300           ;c - copy
-  dc.w    HelpText_MsgHeader_Copy, HelpText_MsgText_Copy
+  dc.l    HelpText_MsgHeader_Copy, HelpText_MsgText_Copy
   dc.w    $5200           ;r - register modify
-  dc.w    HelpText_MsgHeader_Register, HelpText_MsgText_Register
+  dc.l    HelpText_MsgHeader_Register, HelpText_MsgText_Register
   dc.w    $4100           ;a - assembly listing
-  dc.w    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
+  dc.l    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
   dc.w    $4900           ;b - basic interpreter
-  dc.w    HelpText_MsgHeader_Basic, HelpText_MsgText_Basic
+  dc.l    HelpText_MsgHeader_Basic, HelpText_MsgText_Basic
   dc.w    $4e00           ;n - configurator
-  dc.w    HelpText_MsgHeader_Config, HelpText_MsgText_Config
+  dc.l    HelpText_MsgHeader_Config, HelpText_MsgText_Config
 HelpTable_End:
 
 
