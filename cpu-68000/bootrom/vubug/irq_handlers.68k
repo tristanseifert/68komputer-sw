@@ -213,9 +213,36 @@ Exception_Privilege:
 ; address error/bus error trap
 ;
 Exception_BusErr:
+  ; should we save the machine state to RAM?
+  btst    #6, (Exception_BusErr_Flags)
+  beq     .NoSaveState
+
+  ; copy state from the stack frame
+  move.w  (sp), (Exception_BusErr_Type)
+  move.l  2(sp), (Exception_BusErr_Address)
+  move.l  10(sp), (Exception_BusErr_Pc)
+
+.NoSaveState:
+  ; are bus errors fatal?
+  btst    #7, (Exception_BusErr_Flags)
+  beq     .IgnoreBusError
+
+  ; they are not; branch to the standard handler
   st.b    (Exception_WasBus)
   bra     Exception_BusAddr_Handle
 
+; We get here if a bus error is not fatal. Just set a flag and return
+.IgnoreBusError:
+  ; set the "bus error occurred" flag
+  st.b    (Exception_BusErr_State)
+
+  ; TODO: do we need to do some additional work to properly resume?
+
+  ; pea     Exception_BusErr_NonFatalContinuation
+  rte
+
+
+; Address error
 Exception_Address:
   sf.b    (Exception_WasBus)
 

@@ -1,4 +1,4 @@
-#68000-based 68komputer Software
+# 68000-based 68komputer Software
 In this directory you will find basically all software needed for the 68000-based 68komputer. This includes:
 
 - bootrom: VUBUG-based monitor, burned into ROM. Provides an interface to applications via traps.

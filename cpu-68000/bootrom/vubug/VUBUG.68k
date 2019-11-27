@@ -666,6 +666,43 @@ UART_IRQ_Ignored:
   dc.w  0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Bus error configuration
+;
+; These memory locations control the behavior of the system during a bus error,
+; unless the bus error vector itself has been patched. It's designed to allow
+; things such as option ROM scanning to detect where peripherals are. Since the
+; hardware will assert a bus error if no device asserts DTACK, we use this as a
+; sort of "time-out" that lets us mark that there is no device at a given memory
+; address.
+;
+; Alternatively, you could just patch the vector table, but fuck it, I already
+; wrote the code to handle this. Meh.
+;
+; High byte:
+;   - Bit 7: When set, bus errors are NOT fatal and execution continues.
+;   - Bit 6: When set, save bus error state to RAM.
+;
+; Low byte:
+;   Set to a non-zero value when a bus error occurs
+Exception_BusErr_Flags:
+  dc.b    0
+Exception_BusErr_State:
+  dc.b    0
+
+; Memory access type and function code that caused the bus error
+Exception_BusErr_Type:
+  dc.w    0
+; Address that caused the bus error
+Exception_BusErr_Address:
+  dc.l    0
+; PC value that caused the error
+Exception_BusErr_Pc:
+  dc.l    0
+; Where should non-fatal bus errors return to?
+Exception_BusErr_NonFatalContinuation:
+  dc.l    0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; queues of received characters. the oldest character will always be at address
 ; 0 of the queue, with newly received characters being placed at successive
 ; locations. A counter is provided to indicate the locaton at which data is
