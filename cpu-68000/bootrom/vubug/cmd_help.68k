@@ -1,0 +1,328 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Provides a short built-in help system over all commands.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Help - display help messages
+;
+;*****************************************
+;*                                       *
+;* Invoke help as follows:               *
+;*                                       *
+;*      h<cr> - print list of available  *
+;*              help                     *
+;*      hx - print help message for x    *
+;*                                       *
+;*****************************************
+; header style (reverse video, bold)
+; pass first the letter, then the description
+Help_Text_Header: macro
+  dc.b    $1b, "[1;7m";, $1b, "[1m"
+  dc.b    \1
+  dc.b    " - "
+  dc.b    \2
+  dc.b    $1b,"[0m"
+  dc.b    cr, lf
+endm
+
+; description style (indented by four characters)
+Help_Text_Description: macro
+  dc.b  "    ", \1
+  dc.b    cr, lf
+endm
+
+; command style (bold title)
+Help_Text_Command: macro
+  ; write the title of the command
+  dc.b    $1b, "[1m";, $1b, "[1m"
+  ; dc.b    "      - ", \1
+  dc.b    "      ",  $E, $60, $F," ", \1
+  dc.b    $1b,"[0m"
+  ; newline, then description (with tab)
+  dc.b    cr, lf
+  dc.b    9, \2
+  dc.b    cr, lf
+endm
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Structure of entry is topic (top),
+; address of short message (hshort),
+; and address of long message (hlong).
+;
+Cmd_Help:
+  ; check if we read a carriage return
+  bsr     getch
+  andi.b  #$5f, d0
+
+  cmpi.b  #$0d, d0
+  bne     .GetTopicHelp
+
+  ; we did, so print all help topics
+
+.PrintAllTopics:
+  bsr     crlf
+  ; bsr     crlf
+  moveq   #((HelpTable_End-HelpTable)/6)-1, d1
+  lea     HelpTable+2, a1
+  move.l  a1, a0
+
+.PrintTopicLoop:
+  ; print that short help message
+  movea.w (a1), a0
+  bsr     Out_Puts
+
+  ; check the next one
+  addq.w  #6, a1
+  dbf     d1, .PrintTopicLoop
+  rts
+
+.GetTopicHelp:
+  ; Try to find the topic in the help table
+  lea     HelpTable, a1
+  moveq   #((HelpTable_End-HelpTable)/6)-1, d1
+
+.FindTopicHelp:
+  ; is this the topic we're looking for?
+  cmp.b   (a1), d0
+  beq     .PrintTopic
+
+  ; go to the next entry in the table
+  addq.l  #6,a1
+  dbf     d1, .FindTopicHelp
+
+  ; no such topic, so print all of them
+  lea     .MsgNoSuchTopic, a0
+  bsr     Out_Puts
+
+  bra     .PrintAllTopics
+
+.PrintTopic:
+  bsr     crlf
+  bsr     crlf
+
+  ; print the "short help" (e.g. the title)
+  addq.l  #2, a1
+  movea.w (a1)+, a0
+  bsr     Out_Puts
+
+  ; then, print the long help (e.g. description)
+  ; bsr     crlf
+  movea.w (a1), a0
+  bra     Out_Puts
+  ; rts
+
+
+.MsgNoSuchTopic:
+  dc.b    cr, lf, $7
+  dc.b    "No such help topic was found. The following commands are supported:"
+  dc.b    cr, lf, nul
+  even
+
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This table maps a character to the help header and detail text.
+HelpTable:
+  dc.w    $4800           ;h - help
+  dc.w    HelpText_MsgHeader_Help, HelpText_MsgText_Help
+  dc.w    $4d00           ;m - memory
+  dc.w    HelpText_MsgHeader_Memory, HelpText_MsgText_Memory
+  dc.w    $4c00           ;l - load
+  dc.w    HelpText_MsgHeader_Load, HelpText_MsgDetail_Load
+  dc.w    $4400           ;d - dump
+  dc.w    HelpText_MsgHeader_Dump, HelpText_MsgText_Dump
+  dc.w    $5300           ;s - single step
+  dc.w    HelpText_MsgHeader_Step, HelpText_MsgText_Step
+  dc.w    $5400           ;t - trace program
+  dc.w    HelpText_MsgHeader_Trace, HelpText_MsgText_Trace
+  dc.w    $4700           ;g - start user program
+  dc.w    HelpText_MsgHeader_Go, HelpText_MsgText_Go
+  dc.w    $4200           ;b - breakpoints
+  dc.w    HelpText_MsgHeader_Breakpoint, HelpText_MsgText_Breakpoint
+  dc.w    $4300           ;c - copy
+  dc.w    HelpText_MsgHeader_Copy, HelpText_MsgText_Copy
+  dc.w    $5200           ;r - register modify
+  dc.w    HelpText_MsgHeader_Register, HelpText_MsgText_Register
+  dc.w    $4100           ;a - assembly listing
+  dc.w    HelpText_MsgHeader_Disasm, HelpText_MsgText_Disasm
+  dc.w    $4900           ;b - basic interpreter
+  dc.w    HelpText_MsgHeader_Basic, HelpText_MsgText_Basic
+  dc.w    $4e00           ;n - configurator
+  dc.w    HelpText_MsgHeader_Config, HelpText_MsgText_Config
+HelpTable_End:
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; help command
+HelpText_MsgHeader_Help:
+  Help_Text_Header "H", "Help"
+  dc.b   nul
+
+HelpText_MsgText_Help:
+  Help_Text_Description "Invoke help as follows"
+  Help_Text_Command "h<cr>", "Displays all available commands"
+  Help_Text_Command "hx", "Displays help for command 'x'"
+  dc.b  nul
+
+; Copy command
+HelpText_MsgHeader_Copy:
+  Help_Text_Header "C", "Copy Memory"
+  dc.b    nul
+
+HelpText_MsgText_Copy:
+  Help_Text_Description "Copy arbitrary pieces of memory. Invoke as follows:"
+  Help_Text_Command "c xxxxxxxx=yyyyyyyy,zzzzzzzz", "Copy data from yyyyyyyy thru zzzzzzzz to xxxxxxxx and upward"
+  dc.b  nul
+
+
+; memory mode command
+HelpText_MsgHeader_Memory:
+  Help_Text_Header "M", "Manipulate memory"
+  dc.b    nul
+
+HelpText_MsgText_Memory:
+  Help_Text_Description "Invoke memory mode as follows:"
+  Help_Text_Command "m<cr>", "Start memory mode at last address"
+  Help_Text_Command "m xxxxxxxx", "Start memory mode at specified address"
+
+  Help_Text_Description "\r\n    Memory mode accepts the following commands:"
+  Help_Text_Command ".xxxxxxxx", "Set pointer to specified address"
+  Help_Text_Command "=xx", "Updates the byte at the current address"
+  Help_Text_Command ",xx", "Increment current address, then set its value"
+  Help_Text_Command "+", "Increment address"
+  Help_Text_Command "-", "Decrement address"
+  Help_Text_Command "<cr>", "Prints current address and value"
+  dc.b    nul
+
+
+; register command
+HelpText_MsgHeader_Register:
+  Help_Text_Header "R", "Manipulate registers"
+  dc.b    nul
+
+HelpText_MsgText_Register:
+  Help_Text_Description "Enter the register manipulation mode as follows:"
+  Help_Text_Command "r<cr>", "Enter register mode"
+  Help_Text_Command "r xx", "Enter register mode at register xx"
+
+  Help_Text_Description "\r\n    Register mode accepts the following commands:"
+  Help_Text_Command ".xx", "Set pointer to register"
+  Help_Text_Command "=xxxxxxxx", "Update current register to xxxxxxxx"
+  Help_Text_Command "<cr>", "Print all registers"
+
+  Help_Text_Description "\r\n    When a command accepts a register, specify one of SR, PC, d0-d7, a0-a7."
+  dc.b    nul
+
+
+; load/upload commands
+HelpText_MsgHeader_Load:
+  Help_Text_Header "L", "Load data from host via UART B"
+  dc.b    nul
+
+HelpText_MsgDetail_Load:
+  Help_Text_Description "Load is invoked as follows:"
+  Help_Text_Command "l<cr>", "Load from host with no offset"
+  Help_Text_Command "l xxxxxxxx", "Load from host with offset xxxxxxxx"
+  dc.b    nul
+
+
+; breakpoint command
+HelpText_MsgHeader_Breakpoint:
+  Help_Text_Header "B", "Manage breakpoints"
+  dc.b    nul
+
+HelpText_MsgText_Breakpoint:
+  Help_Text_Description "Invoke breakpoint management as follows:"
+  Help_Text_Command "b<cr>", "display breakpoints"
+  Help_Text_Command "b+xxxx", "add a breakpoint at xxxx"
+  Help_Text_Command "b-xxxx", "delete breakpoint at xxxx"
+  Help_Text_Command "b#", "delete all breakpoints"
+  dc.b    nul
+
+
+; dump memory command
+HelpText_MsgHeader_Dump:
+  Help_Text_Header "D", "Dump memory"
+  dc.b  nul
+
+HelpText_MsgText_Dump:
+  Help_Text_Description   "Invoke dump as follows:"
+  Help_Text_Command   "d<cr>", "Dump the next 64 bytes from last examined location"
+  Help_Text_Command   "d xxxxxxxx<cr>", "Dump the next 64 bytes from address xxxxxxxx"
+  Help_Text_Command   "d xxxxxxxx,yyyyyyyy", "Dump bytes between xxxxxxxx and yyyyyyyy"
+  dc.b    nul
+
+
+; disassemble command
+HelpText_MsgHeader_Disasm:
+  Help_Text_Header "A", "Disassemble instructions"
+  dc.b    nul
+
+HelpText_MsgText_Disasm:
+  Help_Text_Description   "Invoke disassembly as follows:"
+  Help_Text_Command   "a<cr>", "Disassemble the next 20 instructions from last location"
+  Help_Text_Command   "a xxxxxxxx<cr>", "Disassemble the next 20 instructions starting at xxxxxxxx"
+  Help_Text_Command   "a xxxxxxxx,yyyyyyyy", "Disassemble instructions between xxxxxxxx and yyyyyyyy"
+  dc.b    nul
+
+
+; trace mode command
+HelpText_MsgHeader_Trace:
+  Help_Text_Header "T", "Toggle trace mode"
+  dc.b    nul
+
+HelpText_MsgText_Trace:
+  Help_Text_Description "Invoke trace as follows:"
+  Help_Text_Command "t+", "Turn on trace mode"
+  Help_Text_Command "t-", "Turn off trace mode"
+  dc.b    nul
+
+
+; single step command
+HelpText_MsgHeader_Step:
+  Help_Text_Header "S", "Toggle single step mode"
+  dc.b    nul
+
+HelpText_MsgText_Step:
+  Help_Text_Description "Invoke single step as follows:"
+  Help_Text_Command "s+", "Turn on single step"
+  Help_Text_Command "s-", "Turn off single step"
+  dc.b    nul
+
+
+; Go: run user command
+HelpText_MsgHeader_Go:
+  Help_Text_Header "G", "Start user program"
+  dc.b    nul
+
+HelpText_MsgText_Go:
+  Help_Text_Description "Invoke go as follows:"
+  Help_Text_Command "g<cr>", "Go from start address in last load"
+  Help_Text_Command "<cr>", "same as g<cr>"
+  Help_Text_Command "g xxxxxxxx", "Start from address xxxxxxxx"
+  Help_Text_Description "\r\n    Send BREAK on UART A to return to the monitor."
+  dc.b    nul
+  even
+
+
+; BASIC: Start the BASIC interpreter
+HelpText_MsgHeader_Basic:
+  Help_Text_Header "I", "Invoke the BASIC interpreter"
+  dc.b    nul
+
+HelpText_MsgText_Basic:
+  Help_Text_Description "Invoke BASIC as follows:"
+  Help_Text_Command "i", "Jumps to the interpreter"
+  Help_Text_Description "\r\n    Return to the monitor by sending Ctrl+D on UART A."
+  dc.b    nul
+  even
+
+
+; Config: Start the configurator
+HelpText_MsgHeader_Config:
+  Help_Text_Header "N", "Invoke the configurator"
+  dc.b    nul
+
+HelpText_MsgText_Config:
+  Help_Text_Description "Invoke the configurator as follows:"
+  Help_Text_Command "n", "Runs the configurator"
+  dc.b    nul
+  even

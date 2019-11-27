@@ -1,0 +1,419 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Routines for interfacing with the MC68681 DUART.
+;
+; UART 0 is used by the bootloader and for logging from the application; UART 1
+; can be used by the application for whatever purpose it desires, and may be
+; reconfigured as desired.
+;
+; On reset, both UARTs are configured to operate at 9600 baud, and a periodic
+; timer is set to fire every 10ms.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Resets and initializes the 68681 peripheral.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_Reset:
+  moveq   #0, d0
+
+  ; clear memory (128 bytes)
+  lea     (Loader_68681Base), a0
+  moveq   #31, d1
+
+.Clear:
+  move.l  d0, (a0)+
+  dbf     d1, .Clear
+
+  ; copy registers
+  lea     (MC68681_Reset_Data), a0
+  lea     (MC68681_Base), a1
+
+  moveq   #0, d1
+
+.next:
+  ; load register number
+  move.b  (a0)+, d0
+
+  ; if register number is $FF, abort
+  cmp.b   #$FF, d0
+  beq.s   .done
+
+  ; write register data
+  move.b  (a0)+, d1
+  move.b   d1, (a1, d0.w)
+
+  ; do the next register
+  bra.s   .next
+
+.done:
+  ; lastly, start the timer by reading from the appropriate address
+  move.b  MC68681_R_SCC(a1), d0
+
+  rts
+
+; a set of 2-byte tuples in the format of register, value; terminated with a
+; register number of $FF.
+MC68681_Reset_Data:
+  ; aux control: bit rate set 1, timer mode with CLK/1. no input change IRQ
+  dc.b    MC68681_W_ACR, %11100000
+
+  ; configure timer with a value of 18432 ($4800), this gives us 100Hz
+  dc.b    MC68681_W_CTU, $48
+  dc.b    MC68681_W_CTL, $00
+
+  ; port A: reset receiver, transmitter, error status, break change interrupt
+  dc.b    MC68681_W_CRA, %00100000
+  dc.b    MC68681_W_CRA, %00110000
+  dc.b    MC68681_W_CRA, %01000000
+  dc.b    MC68681_W_CRA, %01010000
+  ; port A: RxRDY IRQ, no parity, character FIFO errors, normal operation, 8N1
+  dc.b    MC68681_W_CRA, %00010000 ; reset MRn pointer
+  dc.b    MC68681_W_MRnA, %00010011
+  dc.b    MC68681_W_MRnA, %00000111
+  ; port A: set 9600 baud, set active mode, enable TX and RX
+  dc.b    MC68681_W_CRA, %10010000 ; clear RX BRG bit (X = 0)
+  dc.b    MC68681_W_CRA, %10110000 ; clear TX BRG bit (X = 0)
+  ; dc.b    MC68681_W_CSRA, %10111011 ; set 9600 baud
+  dc.b    MC68681_W_CSRA, %11001100 ; set 19.2k baud
+  dc.b    MC68681_W_CRA, %11010000
+  dc.b    MC68681_W_CRA, %00000101
+
+
+  ; port B: reset receiver, transmitter, error status, break change interrupt
+  dc.b    MC68681_W_CRB, %00100000
+  dc.b    MC68681_W_CRB, %00110000
+  dc.b    MC68681_W_CRB, %01000000
+  dc.b    MC68681_W_CRB, %01010000
+  ; port B: RxRDY IRQ, no parity, character FIFO errors, normal operation, 8N1
+  dc.b    MC68681_W_CRB, %00010000 ; reset MRn pointer
+  dc.b    MC68681_W_MRnB, %00010011
+  dc.b    MC68681_W_MRnB, %00000111
+  ; ; port B: set 9600 baud, set active mode, enable TX and RX
+  ; dc.b    MC68681_W_CRB, %10010000 ; clear RX BRG bit (X = 0)
+  ; dc.b    MC68681_W_CRB, %10110000 ; clear TX BRG bit (X = 0)
+  ; dc.b    MC68681_W_CSRB, %10111011
+  ; dc.b    MC68681_W_CRB, %11010000
+  ; dc.b    MC68681_W_CRB, %00000101
+  ; port B: set 14,400 baud, set active mode, enable TX and RX
+  dc.b    MC68681_W_CRB, %10000000 ; set RX BRG bit (X = 1)
+  dc.b    MC68681_W_CRB, %10100000 ; set TX BRG bit (X = 1)
+  dc.b    MC68681_W_CSRB, %01010101 ; select 14.4k baud
+  dc.b    MC68681_W_CRB, %11010000 ; set active mode
+  dc.b    MC68681_W_CRB, %00000101 ; enable tx/rx
+
+  ; configure output port: OP3 = STATUS0, OP7 = STATUS1
+  dc.b    MC68681_W_OPCR, %00000000
+
+  ; clear all outputs except
+  dc.b    MC68681_W_SOPBC, %11101111
+  dc.b    MC68681_W_COPBC, %00000000
+
+  ; vector
+  dc.b    MC68681_W_IVR, 26
+
+  ; configure interrupts: break change A, counter ready
+  dc.b    MC68681_W_IMR, %00001100
+
+  ; done
+  dc.b    $FF, 0
+  even
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Disables the UART receivers.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_DisableRx:
+  lea     MC68681_Base, a0
+
+  ; reset, then enable receiver for A
+  move.b  #%00000010, MC68681_W_CRA(a0)
+
+  ; disable receivers for B
+  move.b  #%00000010, MC68681_W_CRB(a0)
+
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Enables the UART receivers.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_EnableRx:
+  lea     MC68681_Base, a0
+
+  ; reset, then enable receiver for A
+  move.b  #%00100000, MC68681_W_CRA(a0)
+  move.b  #%00000001, MC68681_W_CRA(a0)
+
+  ; reset, then enable receivers for B
+  move.b  #%00100000, MC68681_W_CRB(a0)
+  move.b  #%00000001, MC68681_W_CRB(a0)
+
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Updates the state of the 68681 output register from memory.
+;
+; Since the output status registers are inverted from their real state, any
+; bits we want to be high need to actually be cleared in the chip. This is
+; accomplished with a bit of clever bit twiddling.
+;
+; Clobbers:
+;   d0, a0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_UpdateOutput:
+  lea     (MC68681_Base), a0
+
+  ; read the output
+  move.b  (Loader_68681Out), d0
+
+  ; bits that are SET in memory must be written to the CLEAR area
+  move.b  d0, MC68681_W_COPBC(a0)
+
+  ; flip the bits, and write those to the SET area
+  not.b   d0
+  move.b  d0, MC68681_W_SOPBC(a0)
+
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Updates the in-memory copy of the input port.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_UpdateInput:
+  ; simple, just read the port, lol
+  lea     (MC68681_Base), a0
+  move.b  MC68681_R_IP(a0), (Loader_68681In)
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Transmits the given byte of data on UART A or B.
+;
+; INPUTS:
+;   d0: Character to send
+;
+; CLOBBERS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_Putch_A:
+  ; read the status register, check TXRDY bit (2), loop while clear
+  ; move.b  (MC68681_Base+MC68681_R_SRA), d0
+  btst    #2, (MC68681_Base+MC68681_R_SRA)
+  beq     MC68681_Putch_A
+
+  ; write character to DUART
+  move.b  d0,(MC68681_Base+MC68681_W_THRA)
+  rts
+
+MC68681_Putch_B:
+  ; read the status register, check TXRDY bit (2), loop while clear
+  ; move.b  (MC68681_Base+MC68681_R_SRA), d0
+  btst    #2, (MC68681_Base+MC68681_R_SRB)
+  beq     MC68681_Putch_B
+
+  ; write character to DUART
+  move.b  d0,(MC68681_Base+MC68681_W_THRB)
+  rts
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Generic routine to pop a character off a receive queue in a1. Output char is
+; in d0, and we wait until data is available
+;
+; CLOBBERS:
+;   d0, d1, a1
+_MC68681_Getch:
+  ; nothing to do here hehe
+.tryAgain:
+  ; ensure interrupts are disabled while we check these fields
+  ori.w   #$0700, sr
+
+  ; is there a byte waiting in the buffer?
+  tst.b   UART_Queue_WritePtr(a1)
+  beq     .waitForByte
+
+  ; read the byte at the head and decrement write ptr
+  subq.b  #1, UART_Queue_WritePtr(a1)
+
+  lea     UART_Queue_Data(a1), a1
+  move.b  0(a1), d0
+
+  ; move queue (we copy all but the last byte)
+  moveq   #(UART_Queue_DataLen-2), d1
+
+.CopyLoop:
+  move.b  1(a1), (a1)
+  addq    #1, a1 ; XXX: can we use postincrement?
+  dbf     d1, .CopyLoop
+
+  ; we're done!
+  andi.w  #$f8ff, sr
+  rts
+
+  ; waits for a byte to be received: really, this waits for an interrupt before
+  ; trying again but whatever man
+.waitForByte:
+  ; this will re-enable interrupts implicitly
+  stop    #$2000
+  bra     .tryAgain
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 68681 ISR
+;
+; This just handles received breaks on UART A (jump into loader monitor) and
+; the timer/counter interrupt.
+;
+; If the application wishes to do its own interrupt handling, it must take care
+; to jump directly to this function after handling its own interrupts. The
+; address of the routine is obtained by preserving the old value of Loader_IRQ2.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MC68681_ISR:
+  ; save regs and load 68681 base address
+  movem.l d0-d1/a0/a6, -(sp)
+  lea     MC68681_Base, a6
+
+  ; read ISR state
+  move.b  MC68681_R_ISR(a6), d0
+
+  ; timer expired?
+  btst    #3, d0
+  beq     .checkChABreak
+
+  ; increment the tick counter and send "STOP COUNTER" cmd to reset
+  addq.l  #1, (Loader_Tick)
+  move.b  MC68681_R_STC(a6), d1
+
+.checkChABreak:
+  ; channel A break?
+  btst    #2, d0
+  beq     .checkChannelBRx
+
+  ; acknowledge interrupt ("reset break irq flag" command to channel A)
+  move.b  #%01010000, MC68681_W_CRA(a6)
+
+  ; print message
+  ; lea     .MsgBreak, a0
+  ; bsr     Out_Puts
+
+  ; jump back to command prompt
+  movem.l (sp)+, d0-d1/a0/a6
+  bra     VUBUG_Restart
+
+.checkChannelBRx:
+  ; channel B receive?
+  btst    #5, d0
+  beq     .checkChannelARx
+
+  ; read from this channel (save d0)
+  move.b  d0, -(sp)
+  bsr     .ChB_Rx
+  move.b  (sp)+, d0
+
+.checkChannelARx:
+  ; channel A receive?
+  btst    #1, d0
+  beq     .checksDone
+
+  ; read from this channel (save d0)
+  move.b  d0, -(sp)
+  bsr     .ChA_Rx
+  move.b  (sp)+, d0
+
+.checksDone:
+  ; done, clean up
+  movem.l (sp)+, d0-d1/a0/a6
+  rte
+
+.MsgBreak:
+  dc.b    "Break", cr, lf, nul
+  even
+
+
+
+; Reads the data from the Channel A register and adds it to the receive queue
+.ChA_Rx:
+  ; read byte
+  move.b  MC68681_R_RHRA(a6), d0
+
+  ; did we receive a Ctrl+C?
+  cmp.b   #$3, d0
+  beq     .ChA_Rx_CtrlC
+  ; did we receive Ctrl+S?
+  cmp.b   #$13, d0
+  beq     .ChA_Rx_CtrlS
+  ; did we receive Ctrl+Q?
+  cmp.b   #$11, d0
+  beq     .ChA_Rx_CtrlQ
+
+  ; if we get here, we should stuff the received byte into the queue
+  lea     (UART_A_Queue), a0
+  bsr     .Rx_Queue_Push
+
+  ; is echo turned on?
+  btst    #0, (MC68681_A_Echo)
+  beq.s   .ChA_Rx_Done
+
+  bra     Out_Putc
+
+.ChA_Rx_Done:
+  rts
+
+  ; Handle Ctrl+S: we set a flag and terminat
+.ChA_Rx_CtrlS:
+  move.b  #$1, (MC68681_A_Flow)
+  bra     .ChA_Rx_Done
+  ; Handle Ctrl+Q: clear the control flag and exit
+.ChA_Rx_CtrlQ:
+  move.b  #$00, (MC68681_A_Flow)
+  bra     .ChA_Rx_Done
+
+  ; Handle Ctrl+C: (should return to prompt)
+.ChA_Rx_CtrlC:
+  ; restore the registers and jump to restart routine
+  movem.l (sp)+, d0-d1/a0
+  bra     VUBUG_Restart
+
+
+; Reads the data from the Channel B register and adds it to the receive queue
+.ChB_Rx:
+  ; read byte
+  move.b  MC68681_R_RHRB(a6), d0
+
+  ; add the byte to the queue
+  lea     (UART_B_Queue), a0
+  bra     .Rx_Queue_Push
+
+  rts
+
+
+; Pushes the byte character in d0 into the queue whose header is in a0.
+;
+; TODO: The carry flag is set if the queue did not have space available.
+;
+; Clobbers:
+;   d0, a0, d1
+.Rx_Queue_Push:
+  ; is there space in the queue?
+  moveq   #0, d1
+  move.b  UART_Queue_WritePtr(a0), d1
+
+  cmp.b   #(UART_Queue_DataLen-1), d1
+  bge     .QueueFull
+
+  ; yep, write it to where the write pointer says
+  move.b  d0, UART_Queue_Data(a0, d1.w)
+
+  ; increment write pointer
+  addq.b  #1, UART_Queue_WritePtr(a0)
+
+  ; we pushed the byte, clear carry flag
+  rts
+
+  ; the queue is full :(
+.QueueFull:
+  rts

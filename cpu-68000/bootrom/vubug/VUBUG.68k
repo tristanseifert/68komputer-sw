@@ -1,0 +1,774 @@
+; include our hardware defines
+  include "../hardware.68k"
+  include "../loader_api.68k"
+
+;       NOTES   : PORTED TO PC BY DAVE GOODMAN
+;               : PORTED TO RAYMATIC 68K BOARD BY RUSSELL G. BROWN
+;       ASSEMBLE: mas68k -l vubug.68k
+;               : ASSEMBLER WILL TAKE FILE vubug.68k AND
+;               : WILL CREATE vubug.o, vubug.l
+;       VER 3.0 : VUBUG VER 3.0 PORTEd TO PC FOR ASSEMBLE USING a68K 9/84
+;       VER 3.1 : VUBUG VER 3.1 FIXED FOR VU68K BOARD 10/86
+;       VER 4.0 : VUBUG VER 4.0 PORTED TO RAYMATIC 68K BOARD 4/88
+;*******************************************
+;*                                         *
+;********         V U B U G         ********
+;*                                         *
+;* Copyright (C) 1983, 1988                *
+;*               Vanderbilt Univ.          *
+;*               Comp. Sci. dept.          *
+;*               PO Box 1679               *
+;*               Station B                 *
+;*               Nashville, Tenn.          *
+;*                          37235          *
+;*                                         *
+;*       author:                           *
+;*              Edward M. Carter           *
+;*                                         *
+;*******************************************
+;*                                         *
+;* This software was prepared for distri-  *
+;* bution by Russell G. Brown.  Please     *
+;* note that it is being distributed at    *
+;* the request of several readers of the   *
+;* usenet newsgroup comp.sys.m68k.  It has *
+;* no warranty of any sort, at all.  I     *
+;* think that the code is fairly self      *
+;* explanatory.  Good luck in modifying    *
+;* it to work on whatever application you  *
+;* may have.                               *
+;*******************************************
+;*                                         *
+;* although the information contained here-*
+;* in, as well as any information provided *
+;* relative thereto, has been carefully re-*
+;* viewed and is believed correct, Vander- *
+;* bilt University assumes no liability    *
+;* arising out of its application or use,  *
+;* neither does it convey any license under*
+;* its patent rights nor the rights of     *
+;* others.                                 *
+;*                                         *
+;*******************************************
+;*                                         *
+;* The commands supported are as follows:  *
+;*                                         *
+;*         m - examine/update memory       *
+;*         l - load program from host      *
+;*         u - load program from terminal  *
+;*         d - display blocks of memory    *
+;*         t - single-step a program       *
+;*         s - single-step                 *
+;*         g - start a user mode program   *
+;*         <cr> - short g command          *
+;*         b - set/remove breakpoints      *
+;*         r - examine/update registers    *
+;*         p - prototype commands          *
+;*         c - copy memory blocks          *
+;*         x - print help messages         *
+;*                                         *
+;* Sub-command under each of these commands*
+;* are shown in the source code for each   *
+;* command.                                *
+;*                                         *
+;*******************************************
+;
+; Breakpoint structure
+;
+instr   =       $0000
+iloc    =       $0002
+;
+; The following is the exception vector
+; table for the monitor. There should be
+; no further "org"s to address contained
+; herein as this will destroy the vector
+; for iterrupts, breakpoints...
+;
+  org     $0
+  ; system stack and entry point
+  dc.l    stack                 ;system stack
+  dc.l    start                 ;initial pc
+
+  ; bus/instruction errors
+  dc.l    Exception_BusErr      ;bus error
+  dc.l    Exception_Address     ;address error
+  dc.l    bhlr                  ;illegal instruction vector
+  ; program errors
+  dc.l    Exception_Generic                    ;zero divide
+  dc.l    Exception_Generic                    ;chk
+  dc.l    Exception_Generic                    ;trapv
+  ; debugging
+  dc.l    Exception_Privilege   ; privileged instruction trap
+  dc.l    Exception_Trace       ; trace handler
+  ; coprocessor traps
+  dc.l    bhlr                  ; emulator trap 1010
+  dc.l    bhlr                  ; emulator trap 1111
+
+  ; some reserved vectors
+  dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+  ; uninitialized interrupt
+  dc.l    RAM_Vector_Irq_Uninitialized
+  ; more reserved vectors
+  dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+  dc.l    Exception_Reserved, Exception_Reserved, Exception_Reserved
+  dc.l    Exception_Reserved, Exception_Reserved
+  ; interrupts
+  dc.l    RAM_Vector_Irq_Spurious
+  dc.l    RAM_Vector_Irq1
+  dc.l    RAM_Vector_Irq2
+  dc.l    RAM_Vector_Irq3
+  dc.l    RAM_Vector_Irq4
+  dc.l    RAM_Vector_Irq5
+  dc.l    RAM_Vector_Irq6
+  dc.l    RAM_Vector_Irq7
+  ; trap vectors
+  dc.l    RAM_Vector_Trap0
+  dc.l    RAM_Vector_Trap1
+  dc.l    RAM_Vector_Trap2
+  dc.l    RAM_Vector_Trap3
+  dc.l    RAM_Vector_Trap4
+  dc.l    RAM_Vector_Trap5
+  dc.l    RAM_Vector_Trap6
+  dc.l    RAM_Vector_Trap7
+  dc.l    RAM_Vector_Trap8
+  dc.l    RAM_Vector_Trap9
+  dc.l    RAM_Vector_TrapA
+  dc.l    RAM_Vector_TrapB
+  dc.l    RAM_Vector_TrapC
+  dc.l    RAM_Vector_TrapD
+  dc.l    RAM_Vector_TrapE
+  dc.l    RAM_Vector_TrapF
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;+++++++++++++++++++++++++++++++++++++++++
+;                                        +
+;            Start of monitor            +
+;                                        +
+;+++++++++++++++++++++++++++++++++++++++++
+        ; org     $C0
+
+; this is the escape sequence Esc E
+csc     =       $1b45           ;clear screen (h-19)
+; define some other characters
+cr      =       $0d
+lf      =       $0a
+nul     =       $00
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+howdy:
+  dc.w    csc
+
+  ; reset terminal attributes
+  dc.b    $1b, "[0m"
+
+  ; set the ASCII character set as graphics set 0
+  dc.b    $1b, "(B"
+  ; set the "dec special graphics" as graphics set 1
+  dc.b    $1b, ")0"
+
+  ; draw top border
+  dc.b    $E, $6C
+  dcb.b   $33, $71
+  dc.b    $6B, $F
+  dc.b    cr,lf
+
+  ; first line
+  dc.b    $E, $78, $F
+  dc.b    " M68000 Monitor VUBUG Version 4.0 11 August, 1988  "
+  dc.b    $E, $78, $F
+  dc.b    cr,lf
+
+  ; second line
+  dc.b    $E, $78, $F
+  dc.b    " Modified for 68komputer by Tristan Seifert (2019) "
+  dc.b    $E, $78, $F
+  dc.b    cr,lf
+
+  ; bottom border
+  dc.b    $E, $6D
+  dcb.b   $33, $71
+  dc.b    $6A, $F
+
+  dc.b    cr,lf, "Enter 'I' for BASIC, 'H' for help", cr, lf, nul
+
+; bad command entered
+Msg_InvalidCommand:
+  dc.b  $E, $60, $F, " Bad Command"
+  dc.b    $7 ; bell
+  dc.b    cr, lf, nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ssri:   dc.w    $2000           ;supervisor SR
+ssrn:   dc.w    $2700           ;same w/o interrupts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; prompt to accept input at
+Msg_Prompt:
+  ; ; reset terminal attributes
+  ; dc.b    $1b, "[0m"
+  ; ; set the ASCII character set as graphics set 0
+  ; dc.b    $1b, "(B"
+  ; ; set the "dec special graphics" as graphics set 1
+  ; dc.b    $1b, ")0"
+
+  dc.b    cr,lf
+  dc.b    '!'
+  dc.b    nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; monitor entry
+start:
+  ; set up hardware
+  move    #$2700, sr
+  bsr     RAM_Vector_Init
+
+  bsr     MC68681_Reset
+  bsr     MC68681_DisableRx
+
+  bsr     RTC_Reset
+
+  ; RXRDY_B, timer, break_A, RXRDY_A; then install our IRQ handler
+  move.b  #%00101110, (MC68681_Base+MC68681_W_IMR)
+
+; set up buffers
+gwan:
+  ; clear both of our receive buffers
+  moveq   #0, d0
+  move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
+  move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
+
+  lea     UART_Queue_Data+UART_A_Queue, a0
+  lea     UART_Queue_Data+UART_B_Queue, a1
+  move    #3, d1
+
+.Clear:
+  move.l  d0, (a0)+
+  move.l  d0, (a1)+
+  dbf     d1, .Clear
+
+  ; clear control variables
+  move.l  d0, (exam)
+  move.b  d0, (bkptf)
+
+  ; clear the timer counter value
+  move.l  d0, (Loader_Tick)
+
+  ; clear the breakpoint table
+  moveq   #$4, d1
+  lea     bktab, a0
+
+.clearBkpt:
+  move.l  d0, (a0)+
+  dbf     d1, .clearBkpt
+
+  ; clear register save area
+  move.w  #0, (_sr)
+  moveq   #$10, d1
+  lea     (_pc), a0
+
+.clearBkptLoop:
+  move.l  d0, (a0)+
+  dbf     d1, .clearBkptLoop
+
+
+  ; set up user stack pointer
+  lea     ustck, a0
+  move.l  a0, (ar7)
+
+  ; clear system stack
+  lea     (sarea), a0
+  moveq   #$3f, d1
+
+.clearStack:
+  move.l  d0, (a0)+
+  dbf     d1, .clearStack
+
+
+.setupDone:
+  ; setup is done. enable IRQs, and output the header/version
+  move.w  ssri, sr
+  lea     howdy, a0
+  bsr     Out_Puts
+
+  ; build date
+  lea     Msg_BuildDate, a0
+  bsr     Out_Puts
+  bsr     crlf
+
+  ; enable the receivers here
+  bsr     MC68681_EnableRx
+
+  ; turn on terminal echo and enter command loop
+  bsr     Echo_On
+  bra     comm
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; TTY and other IO routines
+  include "tty.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include any of our hardware glue
+  include "hw_glue.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Sets up an exception frame that enters us back into the command loop.
+;
+VUBUG_Restart:
+  ; restore all the registers we backed up earlier
+  ; movem.l (sp)+, d0-d1/a0 ; from VUBUG_MC68681_ISR
+
+  move    #$2700, sr
+
+  ; restore the default interrupts
+  bsr     RAM_Vector_Init
+
+  ; disable receivers
+  bsr     MC68681_DisableRx
+
+  ; wait for the break condition to be over on UART A
+.WaitBreak:
+  btst    #7, (MC68681_Base+MC68681_R_SRA)
+  bne     .WaitBreak
+
+  ; reset the 68681 receivers and clear rx buffers
+  moveq   #0, d0
+  move.w  d0, (UART_Queue_WritePtr+UART_A_Queue)
+  move.w  d0, (UART_Queue_WritePtr+UART_B_Queue)
+
+  ; enable channel a/b rx, channel a break, timer
+  move.b  #%00101110, (MC68681_Base+MC68681_W_IMR)
+
+  ; then, enable the receivers
+  bsr     MC68681_EnableRx
+
+  ; print a divider
+  bsr     Out_Divider
+
+  ; build a "fake" exception return frame
+  movem.l #$ffff,dr0              ;save registers d0-a7
+  move.l  usp,a0                  ;save user stack pointer
+  move.l  a0,ar7
+  move.w  (a7)+,_sr               ;save status register from stack
+  move.l  (a7)+,_pc               ;save program counter from stack
+  pea     comm                    ;fake a return to command loop
+  move.w  ssri,-(a7)              ;fake a new status register
+  rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; command interpreter. each entry is 6 bytes
+;
+CommandTable:
+  dc.w    $4d00           ;m - memory update
+  dc.l    Cmd_MemUpdate
+  dc.w    $4c00           ;l - load from host
+  dc.l    Cmd_Load
+  dc.w    $4400           ;d - dump contents of memory
+  dc.l    Cmd_MemDump
+  dc.w    $5300           ;s - single step
+  dc.l    Cmd_SingleStep
+  dc.w    $5400           ;t - trace a program's path
+  dc.l    Cmd_Trace
+  dc.w    $4700           ;g - start user program
+  dc.l    Cmd_Go
+  dc.w    $0d00           ;<cr> - short g command
+  dc.l    Cmd_Go_NoAddr
+  dc.w    $4200           ;b - set/remove breakpoints
+  dc.l    bkpt
+  dc.w    $4300           ;c - copy memory blocks
+  dc.l    Cmd_MemCopy
+  dc.w    $5200           ;r - display/modify registers
+  dc.l    regs
+  dc.w    $4800           ;h - display help messages
+  dc.l    Cmd_Help
+  dc.w    $4100           ;a - assembly listing
+  dc.l    Cmd_Disassemble
+  dc.w    $4900           ;I - start basic interpreter
+  dc.l    Cmd_StartBasic
+  dc.w    $4e00           ;N - load config program
+  dc.l    Cmd_StartConfig
+CommandTable_End:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Structure of each entry is command
+; (com) and address of servicing routine
+; (code)
+;
+com     =       $0
+code    =       $2
+
+comm:
+  ; display command prompt
+  lea     Msg_Prompt, a0
+  bsr     Out_Puts
+
+  ; ensure echo is on
+  bsr     Echo_On
+
+  ; read a character in, uppercase it, and begin searching the command table
+  bsr     getch
+  and.b   #$5f, d0
+
+  lea     CommandTable-6, a2
+  ; moveq   #$0e, d2
+  moveq   #((CommandTable_End-CommandTable)/6)-1, d2
+
+clp:
+  ; advance to the next slot
+  addq.w  #6, a2
+
+  ; does the character match?
+  cmp.b   com(a2), d0
+  ; if not, check the next slot
+  dbeq    d2, clp
+  ; if it didn't match, we're at the end and couldn't find a command
+  bne     .BadCommand
+
+  ; get the address of the routine and jump to it
+  movea.l code(a2), a2
+  jsr     (a2)
+  bra     comm
+
+
+.BadCommand:
+  ; print a "bad command" message
+  lea     Msg_InvalidCommand, a0
+  bsr     Out_Puts
+  bra     comm
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Starts the BASIC interpreter
+Cmd_StartBasic:
+  bsr     Echo_Off
+
+  ; print message
+  lea     .MsgDecompressing, a0
+  bsr     Out_Puts
+
+  ; load the app and st ore its address
+  lea     $0000800C, a0
+  bsr     App_Load
+  move.l  a0, (_pc)
+
+  ; clear breakpoint flags
+  move.b  #0, (bkptf)
+
+  ; print the address
+  lea     .MsgLoadedTo, a0
+  bsr     Out_Puts
+
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+
+  bsr     crlf
+  bsr     Out_Divider
+  ; bsr     crlf
+
+  ; go and run it
+  bsr     Echo_On
+  ; bsr     crlf
+
+  bra     Cmd_Go_RunProgram
+
+.MsgDecompressing:
+  dc.b    cr, lf
+  dc.b    "Decompressing BASIC...", cr, lf, nul
+.MsgLoadedTo:
+  dc.b    "Loaded to $", nul
+  even
+
+Cmd_StartConfig:
+  bsr     Echo_Off
+
+  ; print message
+  lea     .MsgDecompressing, a0
+  bsr     Out_Puts
+
+  ; load the app and st ore its address
+  lea     $00008020, a0
+  bsr     App_Load
+  move.l  a0, (_pc)
+
+  ; clear breakpoint flags
+  move.b  #0, (bkptf)
+
+  ; print the address
+  lea     .MsgLoadedTo, a0
+  bsr     Out_Puts
+
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+
+  bsr     crlf
+  bsr     Out_Divider
+  ; bsr     crlf
+
+  bra     Cmd_Go_RunProgram
+
+.MsgDecompressing:
+  dc.b    cr, lf
+  dc.b    "Decompressing configurator...", cr, lf, nul
+.MsgLoadedTo:
+  dc.b    "Loaded to $", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include interrupt handlers
+  include "irq_handlers.68k"
+; memory related commands
+  include "cmd_mem.68k"
+; load commands
+  include "cmd_load.68k"
+; various debug commands
+  include "cmd_debug.68k"
+  include "cmd_listing.68k"
+; help system
+  include "cmd_help.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; library routines
+  include "lib.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; LZ4 decompression (supports compressed apps in ROM)
+; put the input buffer in a0, output in a1
+Lib_LZ4:
+; from lz4-68k/lz4_frame.asm
+lz4_frame_depack:
+	cmpi.l	#$04224d18,(a0)+	; LZ4 frame MagicNb
+	bne  	.Error
+
+	move.b	(a0),d0
+	andi.b	#%11001001,d0		; check version, no depacked size, and no DictID
+	cmpi.b	#%01000000,d0
+	bne  	.Error
+
+	; read 32bits block size without movep (little endian)
+	move.b	6(a0),d0
+	lsl.w	#8,d0
+	move.b	5(a0),d0
+	swap	d0
+	move.b	4(a0),d0
+	lsl.w	#8,d0
+	move.b	3(a0),d0
+	lea		7(a0),a0			; skip LZ4 block header + packed data size
+
+	bra  	lz4_depack
+
+.Error:
+  illegal
+
+  include "lz4-68k/lz4_normal.asm"
+  ; include "lz4-68k/lz4_fastest.asm"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Metadata
+Msg_BuildDate:
+  dc.b    "Built on: "
+
+Info_BuildDate:
+  incbin  "../builddate.txt"
+  dc.b    0
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; hardware routines
+  include "../68681.68k"
+  include "../rtc.68k"
+
+; loader API
+  include "../loader_svc.68k"
+
+; app loading
+  include "apps/api.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; stub tick handler
+Loader_Handle_Tick:
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Bootloader API entry point: this gives application programs a simple API to
+; interact with the hardware
+  include "loader_entry.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Monitor data area: this will be located in RAM and we just don't load it
+;
+; RAM Base address
+  org     RAM_Monitor
+
+; system stack (512 bytes)
+sarea:  dcb.w   512,0
+stack   =       *
+
+; breakpoint table
+bktab:  dcb.l   $0a,$0000
+
+; saved registers
+_sr:    dc.w    $0000
+_pc:    dc.l    $00000000
+
+dr0:    dc.l    $00000000
+dr1:    dc.l    $00000000
+dr2:    dc.l    $00000000
+dr3:    dc.l    $00000000
+dr4:    dc.l    $00000000
+dr5:    dc.l    $00000000
+dr6:    dc.l    $00000000
+dr7:    dc.l    $00000000
+ar0:    dc.l    $00000000
+ar1:    dc.l    $00000000
+ar2:    dc.l    $00000000
+ar3:    dc.l    $00000000
+ar4:    dc.l    $00000000
+ar5:    dc.l    $00000000
+ar6:    dc.l    $00000000
+ar7:    dc.l    $00000000
+
+ptab:   dcb.w   $3,0000                 ;prototype table
+rexam:  dc.w    $0000                   ;register examination pointer
+exam:   dc.l    $0000                   ;memory examination pointer
+
+; temporary memory
+t1:     dc.w    $0000                   ;temporary work area
+t2:     dc.w    $0000
+t3:     dc.w    $0000
+t4:     dc.w    $0000
+t5:     dc.w    $0000
+
+; ctrl+s/ctrl+q flags
+ctrls:  dc.w    $0000                   ;ctrl-s,ctrl-q flag
+bkptf   =       *-1                     ;breakpoint flag
+
+; user stack (512 bytes)
+users:  dcb.b   512,00
+ustck   =       *
+
+aend:   dc.l    $0000
+siz:    dc.w    $0000
+writm:  dc.w    $0000
+echo:   dc.w    $0000                   ;terminal port echo flag
+
+; when set, the 68681 interrupt is ignored
+UART_IRQ_Ignored:
+  dc.w  0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; queues of received characters. the oldest character will always be at address
+; 0 of the queue, with newly received characters being placed at successive
+; locations. A counter is provided to indicate the locaton at which data is
+; currently being written.
+;
+; Detecting whether data is available in the queue can be done by checking the
+; write pointer: if it is at the head of the queue (0) there is no data.
+;
+; Queues are represented as follows:
+; - $00: Write pointer
+; - $01: Unused, should be 0
+; - $02: Data area, 16 bytes
+UART_Queue_WritePtr             = $0
+UART_Queue_Data                 = $2
+
+UART_Queue_DataLen              = $10
+
+UART_A_Queue:
+  dc.b  0, 0
+  dc.l  0, 0, 0, 0
+  even
+
+UART_B_Queue:
+  dc.b  0, 0
+  dc.l 0, 0, 0, 0
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Load variables
+
+; Base address of load
+Load_BaseAddr:
+  dc.l    0
+; Total number of bytes to read
+Load_TotalLength:
+  dc.l    0
+; received checksum
+Load_ReceivedChecksum:
+  dc.l    0
+; our computed checksum
+Load_LocalChecksum:
+  dc.l    0
+
+; do we run the program after loading it?
+Load_RunAfterLoad:
+  dc.b    0
+
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; RAM vectors
+RAM_Vectors_Start:
+
+RAM_Vector_Irq_Uninitialized:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq_Spurious:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq1:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq2: ; DUART
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq3:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq4:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq5:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq6:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Irq7: ; nmi
+  dc.l    0, 0, 0, 0
+
+RAM_Vector_Trap0:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap1:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap2:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap3:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap4:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap5:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap6:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap7:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap8:
+  dc.l    0, 0, 0, 0
+RAM_Vector_Trap9:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapA:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapB:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapC:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapD:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapE:
+  dc.l    0, 0, 0, 0
+RAM_Vector_TrapF:
+  dc.l    0, 0, 0, 0
+
+RAM_Vectors_End:
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; whether the exception was a bus or address error
+Exception_WasBus:
+  dc.b    0
+  even

@@ -1,0 +1,7 @@
+# directory outputs
+directory.lst
+directory.bin
+
+# compressed apps
+ebasic.bin.lz4
+config.bin.lz4

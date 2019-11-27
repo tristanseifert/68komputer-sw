@@ -1,0 +1,40 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Specific glue to make VUBUG work on the 68komputer hardware.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Getch - get a character from the input
+; queue. If none available then wait for it (reads from TTY/UART A)
+;
+; Char is returned to d0
+;
+getch:
+  ; save registers and set up the queue
+  movem.l d1/a1, -(sp)
+  lea     UART_A_Queue, a1
+
+  ; actually read the char
+  bsr     _MC68681_Getch
+
+  ; clean up (restore registers)
+  movem.l (sp)+, d1/a1
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Lgch - get a character from the serial port
+; queue. If none available then wait for one (reads from serial/UART B)
+;
+; Char is returned to d0
+;
+lgch:
+  ; save registers and set up the queue
+  movem.l d1/a1, -(sp)
+  lea     UART_B_Queue, a1
+
+  ; actually read the char
+  bsr     _MC68681_Getch
+
+  ; clean up (restore registers)
+  movem.l (sp)+, d1/a1
+  rts

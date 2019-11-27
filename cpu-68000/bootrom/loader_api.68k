@@ -1,0 +1,42 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Bootloader API and defines
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Periodic timer (ticks at 100Hz)
+Loader_Tick               = RAM_Loader
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; In memory date/time variables (32 bytes)
+Loader_DateTimeBase       = RAM_Loader + $30
+Loader_DateTimeBaseSz     = $20
+
+Loader_DateCentury        = Loader_DateTimeBase + $00
+Loader_DateYear           = Loader_DateTimeBase + $01
+Loader_DateMonth          = Loader_DateTimeBase + $02
+Loader_DateDay            = Loader_DateTimeBase + $03
+Loader_DateDayOfWeek      = Loader_DateTimeBase + $04
+
+Loader_TimeHours          = Loader_DateTimeBase + $05
+Loader_TimeMinutes        = Loader_DateTimeBase + $06
+Loader_TimeSeconds        = Loader_DateTimeBase + $07
+Loader_TimeMSeconds       = Loader_DateTimeBase + $08
+
+; Buffer for reading/writing 64 bits from RTC
+Loader_RTCBuffer          = Loader_DateTimeBase + $10
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 68681 buffers/state (128 bytes)
+Loader_68681Base          = (Loader_DateTimeBase + Loader_DateTimeBaseSz)
+
+; output port state
+Loader_68681Out           = Loader_68681Base
+; input port state
+Loader_68681In            = Loader_68681Out + 1
+
+; channel A status
+MC68681_A_Status      = Loader_68681In + 1
+; channel A software flow control state
+MC68681_A_Flow            = MC68681_A_Status + 1
+; channel A echo control
+MC68681_A_Echo            = MC68681_A_Flow + 1
+; channel B status
+MC68681_B_Status      = MC68681_A_Echo + 1

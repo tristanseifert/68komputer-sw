@@ -1,0 +1,213 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Routines for interfacing with the TTY
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Generalized write facility writes 1 byte
+; passed in d0 to tty. (UART A)
+;
+Out_Putc:
+writ:
+  btst    #0, (MC68681_A_Flow)             ; Is ctrl-s active
+  beq     .doWrite                ; no, so write character
+
+  stop    #$2000                  ; yes, wait until next int
+  bra     Out_Putc                ; when awakened check again
+
+.doWrite:
+  bra     MC68681_Putch_A
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Generalized routine to write a string which
+; must terminate in a null (goes to UART A/tty)
+;
+Out_Puts:
+  ; get character of string, exit if null
+  move.b  (a0)+, d0                ;a0 is address of string
+  beq     .end
+
+  ; write the char and check the next one
+  bsr     Out_Putc
+  bra     Out_Puts
+
+.end:
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Writes a horizontal divider to the screen.
+Out_Divider:
+  ; put terminal into graphics mode
+  moveq   #$E, d0
+  bsr     Out_Putc
+
+  ; write the horizontal line character for the full width of the terminal
+  moveq   #(80)-1, d1
+  moveq   #$71, d0
+
+.Loop:
+  bsr     Out_Putc
+  dbf     d1, .Loop
+
+  ; exit the alternate font mode
+  moveq   #$F, d0
+  bsr     Out_Putc
+
+  ; now, a newline
+  bra     crlf
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;Generalized routine to write
+;a word, byte or long word. (goes to UART A/tty)
+;
+OutHex_Byte:
+; writb:
+  move.w  #$1, t1                  ;t1 is the number of bytes
+  bra     OutHex
+
+OutHex_Word:
+; writw:
+  move.w  #$3, t1
+  bra     OutHex
+
+OutHex_Address:
+  ; move.w  #$5, t1
+  ; bra     OutHex
+
+OutHex_Long:
+; writl:
+  move.w  #$7, t1
+  ; fall through to wr
+
+
+OutHex:
+  movem.l d1-d2/a0/a6, -(sp)
+
+  ; get the count set above, null terminate the string and set it as a stack
+  move.w  (t1), d2
+
+  lea     t5+1, a6
+  move.b  #0, (a6)
+
+.convertNybble:
+  ; convert each hex digit to an ASCII byte
+  move.b  d0, d1
+  and.b   #$0f, d1
+
+  ; is it A-F?
+  cmp.b   #$0a, d1
+  blt     .isNumber
+
+  ; yeah, format it as such
+  add.b   #$37, d1
+  bra     .writeChar
+
+  ; handle it being a number
+.isNumber:
+  add.b   #$30, d1
+
+  ; push that ASCII character onto our "string stack"
+.writeChar:
+  move.b  d1, -(a6)
+  lsr.l   #4, d0
+
+  ; continue til we're out of nybbles
+  dbf     d2, .convertNybble
+
+  ; then, write that string to the terminal
+  movea.l a6, a0
+  bsr     Out_Puts
+
+  ; restore regs
+  movem.l (sp)+, d1-d2/a0/a6
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; CRLF - write a carriage return and
+; line feed. (to TTY/UART A)
+;
+crlf:
+  lea     .NewlineData, a0
+  bsr     Out_Puts
+  rts
+
+.NewlineData:
+  dc.b    cr, lf, nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Generalized number fetcher (place in a0 the routine to use for reading)
+;
+InHex_Byte:
+; getb:
+  move.w  #1, t1
+  bra     InHex
+
+InHex_Word:
+; getw:
+  move.w  #3, t1
+  bra     InHex
+
+InHex_Long:
+getl:
+  move.w  #7, t1
+
+
+InHex:
+  ; save registers, and restore our counter
+  movem.l d1-d2, -(sp)
+  move.w  t1, d2
+  moveq   #0, d1
+
+blp:
+  ; call the input routine
+  jsr     (a0)
+
+  ; is it A-F?
+  cmp.b   #$3a, d0
+  blt     n1
+  add.b   #$09, d0
+
+n1:
+  and.b   #$0f, d0
+  asl.l   #$4, d1                  ;place in next hex didgit
+  or.b    d0, d1
+  dbf     d2, blp
+  move.l  d1, d0                   ;setup return in d0
+
+  ; restore registers
+  movem.l (sp)+, d1-d2
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Turns off echo: this will disable the cursor as well.
+Echo_Off:
+  ; clear echo flag
+  bclr    #0, (MC68681_A_Echo)
+
+  ; send "cursor off" sequence
+  lea     .MsgCursorOff, a0
+  bra     Out_Puts
+  rts
+
+.MsgCursorOff:
+  dc.b  $1b, "[?25l", nul
+  even
+
+
+; Turns on echo: this enables the cursor as well.
+Echo_On:
+  ; enable echo flag
+  bset    #0, (MC68681_A_Echo)
+
+  ; send the "cursor on" sequence
+  lea     .MsgCursorOn, a0
+  bra     Out_Puts
+  rts
+
+.MsgCursorOn:
+  dc.b  $1b, "[?25h", nul
+  even

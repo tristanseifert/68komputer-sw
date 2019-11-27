@@ -1,0 +1,397 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Various monitor commands to do with memory
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Copy - Copy memory blocks
+;
+;***************************************
+;*                                     *
+;* Copy is invoked as follows:         *
+;*                                     *
+;*          c xxxxxxxx=yyyyyyyy,zzzzzzzz           *
+;*                                     *
+;* Copy locations yyyyyyyy thru zzzzzzzz to    *
+;* locations xxxxxxxx and upward.          *
+;*                                     *
+;***************************************
+;
+Cmd_MemCopy:
+  bsr     getch                   ;get past blank
+
+  ; get target address
+  lea     getch, a0                ;setup for terminal input
+  bsr     InHex_Long                    ;get target address
+  move.l  d0, d2                   ;save it
+  movea.l d0, a2
+
+  ; get delimiter (=)
+  bsr     getch                   ;get past =
+
+  ; get start address
+  bsr     InHex_Long                    ;get start address
+  move.l  d0, d3                   ;save it
+  movea.l d0, a3                   ;again
+
+  ; read in the delimiter
+  bsr     getch                   ;get past ,
+
+  ; get ending address
+  bsr     InHex_Long                    ;get ending address
+
+  ; calculate byte count
+  sub.l   d3, d0                   ;calculate byte count
+  move.l  d0, d4                   ;save it
+
+  ; start copying shit
+  addq.b  #1, d4
+
+.copy:
+  move.b  (a3)+, (a2)+
+  dbf     d0, .copy
+
+  ; output the success message
+  lea     .MsgCopied, a0
+  bsr     Out_Puts
+
+  ; write start address
+  move.l  d3, d0
+  bsr     OutHex_Long
+
+  ; write " to "
+  lea     .MsgTo, a0
+  bsr     Out_Puts
+
+  ; write destination address
+  move.l  d2, d0
+  bsr     OutHex_Long
+
+  ; write " for "
+  lea     .MsgFor, a0
+  bsr     Out_Puts
+
+  ; write byte count
+  move.l  d4, d0
+  bsr     OutHex_Long
+
+  ; write the "bytes" string
+  lea     .MsgBytes, a0
+  bsr     Out_Puts
+
+  rts
+
+
+.MsgCopied:
+  dc.b    lf,cr
+  dc.b    "Copied", nul
+
+.MsgTo:
+  dc.b    " to ", nul
+
+.MsgFor:
+  dc.b    " for ", nul
+
+.MsgBytes:
+  dc.b    " bytes", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Mem - memory update
+;
+;*******************************************
+;*                                         *
+;* Memory sub-commands are as follows:     *
+;*                                         *
+;*          m<cr> - start memory mode      *
+;*          m xxxxxxxx - start m mode at loca- *
+;*                     tion xxxxxxxx          *
+;*          .xxxxxxxx - set pointer to location*
+;*                  xxxxxxxx                   *
+;*          =xx - update current location  *
+;*                to xx                    *
+;*          ,xx - increment location and   *
+;*                update it to xx          *
+;*          + - increment location         *
+;*          - - decrement location         *
+;*          <cr> - print current location  *
+;*                 and value               *
+;*                                         *
+;*******************************************
+mmes:   dc.b    lf,lf,cr
+        dc.b    "Memory Mode", nul
+mprmp:  dc.b    lf,cr,':',nul
+meqm:   dc.b    " == ", 0
+
+Cmd_MemUpdate:
+  ; read in the next byte the user typed
+  bsr     getch                   ;get delimiter
+
+  ; if newline, start at address $0
+  cmp.b   #$0d, d0
+  beq     .NoAddress
+
+  ; otherwise, read a longword address
+  lea     getch, a0
+  bsr     InHex_Long
+  bra     .InitialSetAddress
+
+.NoAddress:
+  moveq   #0, d0
+
+.InitialSetAddress:
+  ; set the examination ptr
+  move.l  d0, (exam)
+
+  ; print memory mode message
+  lea     mmes, a0
+  bsr     Out_Puts
+
+  ; print memory prompt
+.Prompt:
+  lea     mprmp, a0
+  bsr     Out_Puts
+  bsr     getch
+
+  ; search the command table
+  moveq   #((.CmdTable_End-.CmdTable)/4)-1, d2
+  lea     .CmdTable-4, a0
+
+.SearchTable:
+  addq.l  #$4, a0
+
+  ; check character and continue looping if not
+  cmp.b   (a0), d0
+  dbeq    d2, .SearchTable
+  ; exit if no match
+  bne     .Exit
+
+  ; get address of routine and jump to it
+  movea.w $2(a0), a0
+  jsr     (a0)
+  bra     .Prompt
+
+.Exit:
+  rts
+
+
+; various commands
+.SetExamPtr:
+  ; read in an address, then st ore it
+  lea     getch, a0
+  bsr     InHex_Long
+
+  move.l  d0, (exam)
+  bra     .PrintCurrentData
+
+.SetData:
+  ; sets the data at the current memory location
+  lea     getch, a0
+  bsr     InHex_Byte
+
+  movea.l (exam), a0
+  move.b  d0, (a0)
+  bra     .PrintCurrentData
+
+; increments the address pointer
+.IncrementAndSet:
+  addq.l  #1, (exam)
+  bra     .SetData
+
+.IncrementPtr:
+  ; increment memory location and print it
+  addq.l  #1, (exam)
+  bra     .PrintCurrentData
+
+.DecrementPtr:
+  ; decrement memory location and print it
+  subq.l  #1, (exam)
+  bra     .PrintCurrentData
+
+
+.PrintCurrentData:
+  ; writes a memory address and its value
+  bsr     crlf
+
+  move.l  exam, d0
+  bsr     OutHex_Address
+
+  lea     meqm, a0
+  bsr     Out_Puts
+
+  movea.l (exam), a0
+  move.b  (a0), d0
+  bra     OutHex_Byte
+
+; command table for memory mode
+.CmdTable:
+  dc.w    $2e00           ;.
+  dc.w    .SetExamPtr
+  dc.w    $3d00           ;=
+  dc.w    .SetData
+  dc.w    $2c00           ;,
+  dc.w    .IncrementAndSet
+  dc.w    $2b00           ;+
+  dc.w    .IncrementPtr
+  dc.w    $2d00           ;-
+  dc.w    .DecrementPtr
+  dc.w    $0d00           ;<CR>
+  dc.w    .PrintCurrentData
+.CmdTable_End:
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; dump - dump memory
+;
+;*****************************************
+;*                                       *
+;*    dump is invoked as follows:        *
+;*                                       *
+;*    d<cr> - dump the next 64 bytes from*
+;*            last examined location     *
+;*    d xxxxxxxx<cr> - dump the next 64 bytes*
+;*                 from address xxxxxxxx     *
+;*    d xxxxxxxx,yyyyyyyy - dump the bytes bet-  *
+;*                  ween xxxxxxxx and yyyyyyyy   *
+;*                                       *
+;*****************************************
+;
+Cmd_MemDump:
+  ; read the next byte: if it's a space, read an address; if cr, start from ptr
+  lea     getch, a0
+  bsr     getch
+  cmp.b   #$0d, d0
+  bne     .GetStartAddr
+
+  ; start from the exam pointer address
+  movea.l exam, a1
+
+  movea.l a1, a2
+  adda.l  #$40, a2
+  bra     .StartDump
+
+.GetStartAddr:
+  ; read the starting address
+  bsr     InHex_Long
+  movea.l d0, a1
+
+  ; get the delimiter: if CR, start dump - otherwise, read end
+  bsr     getch
+  cmp.b   #$2c, d0
+  bne     .DefaultSize
+
+  ; read the end address
+  bsr     InHex_Long
+  movea.l d0, a2
+  bra     .StartDump
+
+.DefaultSize:
+  ; calculate the ending address as 64 bytes
+  movea.l a1, a2
+  adda.l  #$40, a2
+
+.StartDump:
+  ; disable echo
+  bsr     Echo_Off
+
+  ; display the header
+  bsr     crlf
+  lea     .MsgHeader, a0
+  bsr     Out_Puts
+
+  ; align the starting address to a 16 byte boundary
+  move.l  a1, d0
+  and.b   #$f0, d0
+  movea.l d0, a1
+
+  ; do the same for the ending address
+  move.l  a2, d0
+  or.b    #$0f, d0
+  movea.l d0, a2
+
+  ; set up for the dump loop with the byte counter
+  moveq   #$0f, d1
+
+.DumpRow:
+  ; write the current address
+  move.l  a1, d0
+  bsr     OutHex_Address
+
+  ; write the divider between the address/hex area
+  lea     .Divider, a0
+  bsr     Out_Puts
+
+  ; save the starting address
+  movea.l a1, a3
+
+.DumpByte:
+  ; write a space, read the byte, and output said byte
+  moveq   #$20, d0
+  bsr     writ
+
+  move.b  (a1)+, d0
+  bsr     OutHex_Byte
+
+  ; repeat outputting bytes
+  dbf     d1, .DumpByte
+
+  ; we've finished the hex dump: set up for the ascii dump
+  moveq   #$0f, d1
+  movea.l a3, a1
+
+  ; write the divider between the hex/ascii area
+  lea     .Divider, a0
+  bsr     Out_Puts
+  moveq   #$20, d0
+  bsr     writ
+
+.DumpAscii:
+  ; read the character: if printable (codepoint >= $20), output it
+  move.b  (a1)+, d0
+  cmp.b   #$20, d0
+  bge     .MightBePrintable
+
+  ; the character is not printable
+  bra     .NotPrintable
+
+.MightBePrintable:
+  ; it must also be ≤ $7F
+  cmp.b   #$7f, d0
+  blt     .WriteChar
+
+  ; the character is not printable
+.NotPrintable:
+  move.b  #$2e,d0                 ;no, move in a dot
+
+.WriteChar:
+  ; write the character and repeat
+  bsr     writ
+  dbf     d1, .DumpAscii
+
+  ; print a newline
+  bsr     crlf
+
+  ; increment the address, reset byte counter
+  moveq   #$10, d1
+  cmpa.l  a1, a2
+  dblt    d1, .DumpRow
+
+  ; we're done, update our examination pointer
+  move.l  a1, (exam)
+
+  ; also, re-enable echo
+  bsr     Echo_On
+  rts
+
+
+.MsgHeader:
+  dc.b    lf,cr
+  dc.b    $1b, "[1m", $1b, "[7m", $1b, "[1m"
+  dc.b    " Address    0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   0123456789ABCDEF   "
+  dc.b    $1b,"[0m"
+  dc.b    lf,cr,nul
+
+.Divider:
+  dc.b    " ", $E, $78, $F
+  dc.b    nul
+  even

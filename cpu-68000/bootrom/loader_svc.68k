@@ -1,0 +1,488 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Loader services
+;
+; All services return a status code in d0. 0 for success, negative for error.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; List of available services
+Svc_Table:
+  ; 00: no-op
+  dc.w    Svc_NoOp-Svc_Table
+  ; 01: no-op
+  dc.w    Svc_NoOp-Svc_Table
+  ; 02: no-op
+  dc.w    Svc_NoOp-Svc_Table
+  ; 03: Delay program
+  dc.w    Svc_Delay-Svc_Table
+  ; 04: Get input state
+  dc.w    Svc_ReadIO-Svc_Table
+  ; 05: Set output state
+  dc.w    Svc_WriteIO-Svc_Table
+  ; 06: Read RTC
+  dc.w    Svc_ReadRtc-Svc_Table
+  ; 07: Write RTC
+  dc.w    Svc_WriteRtc-Svc_Table
+  ; 08: Write character to TTY
+  dc.w    Svc_Putc-Svc_Table
+  ; 09: Read character from TTY
+  dc.w    Svc_Getc-Svc_Table
+  ; 0A: Read character from TTY (nonblocking)
+  dc.w    Svc_Getc_Nonblocking-Svc_Table
+  ; 0B: Write string to TTY
+  dc.w    Svc_Puts-Svc_Table
+  ; 0C: Write a number as hexadecimal to TTY
+  dc.w    Svc_OutHex-Svc_Table
+  ; 0D: Reads a number as hexadecimal from the TTY
+  dc.w    Svc_InHex-Svc_Table
+  ; 0E: Set tty attributes
+  dc.w    Svc_TtySetAttribs-Svc_Table
+  ; 0F: Unpack with LZ4
+  dc.w    Svc_Unpack_Lz4-Svc_Table
+  ; 10: Get tick count
+  dc.w    Svc_Get_Ticks-Svc_Table
+Svc_Table_End:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 00 - Does nothing
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_NoOp:
+  moveq   #0, d0
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 03 - Waits for a certain period of time.
+;
+; NOTE:
+;   This routine requires interrupts to be enabled.
+; INPUTS:
+;   d1: How long to delay for, in 1/100ths of a second.
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Delay:
+  lea     Loader_Tick, a0
+
+  ; calculate the tick value to wait for
+  move.l  (a0), d0
+  add.l   d1, d0
+
+  ; wait until the values are identical
+.wait:
+  stop    #$2000 ; wait for an irq
+
+  cmp.l   (a0), d0
+  bhi     .wait
+
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 04 - Reads the input lines on the 68681.
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   d0: State of IO lines: bit 0 is IP0, bit 1 is IP1, and so forth.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_ReadIO:
+  ; update state from hardware
+  bsr.w   MC68681_UpdateInput
+
+  ; read port state
+  move.b  (Loader_68681In), d0
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 05 - Sets the state of the output lines on the 68681.
+;
+; INPUTS:
+;   d1: Which pins to set low (high word) and which to set high (low word). If
+;       the same pin is set to be both low and high, an error is returned.
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_WriteIO:
+  ; back up registers
+  move.l  d2, -(sp)
+
+  ; we only have 8 bits
+  and.l   #$00FF00FF, d1
+
+  ; check that no pins are specified twice
+  moveq   #0, d2
+  move.w  d1, d2
+  swap    d1
+  and.w   d1, d2
+  bne.s   .Invalid
+
+  ; bits to clear are in the low word of d1, so AND against its inverse
+  not.w   d1
+  and.b   d1, (Loader_68681Out)
+
+  ; extract bits to set high (high word of d1)
+  move.w  d1, d2
+  swap    d1
+  and.w   #$00FF, d1
+
+  ; we now have the bits to set in the low byte of d1, so OR into memory state
+  or.b    d1, (Loader_68681Out)
+
+  ; actually update output
+  bsr.w   MC68681_UpdateOutput
+  moveq   #0, d0
+
+.Done:
+  ; Restore registers
+  move.l  (sp)+, d2
+  rts
+
+.Invalid:
+  moveq   #-1, d0
+  bra.s   .Done
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 06 - Reads the RTC and updates the in memory date/time variables.
+;
+; INPUTS:
+;   a1: Location to a time struct that is filled in if provided.
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_ReadRtc:
+  ; back up registers
+  movem.l d0-d3, -(sp)
+
+  move.l  a1, -(sp)
+  bsr.w   RTC_Read
+  move.l  (sp)+, a1
+
+  ; copy the struct if provided
+  move.l  a1, d0
+  tst.l   d0
+  beq     .NoStruct
+
+  ; copy 9 bytes
+  lea     Loader_DateTimeBase, a0
+  moveq   #8, d0
+
+.CopyLoop:
+  move.b  (a0)+, (a1)+
+  dbf     d0, .CopyLoop
+
+.NoStruct:
+  ; restore registers
+  movem.l (sp)+, d0-d3
+  moveq   #0, d0
+
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 07 - Writes to the RTC the values in the memory date/time variables.
+;
+; INPUTS:
+;   a1: Location of a time struct that is used to set the clock, 0 otherwise
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_WriteRtc:
+  ; back up registers
+  movem.l d0-d3/a1, -(sp)
+
+  ; do we have an input time struct?
+  move.l  a1, d0
+  tst.l   d0
+  beq     .NoStruct
+
+  ; copy 9 bytes of struct
+  lea     Loader_DateTimeBase, a0
+  moveq   #8, d0
+
+.CopyLoop:
+  move.b  (a1)+, (a0)+
+  dbf     d0, .CopyLoop
+
+.NoStruct:
+  bsr.w   RTC_Write
+
+  ; restore registers
+  movem.l (sp)+, d0-d3/a1
+  moveq   #0, d0
+
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 08 - Writes a single character to the active TTY.
+;
+; INPUTS:
+;   d1: 8 bit character to write
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Putc:
+  move.b  d1, d0
+  bra     Out_Putc
+
+;   ; write character to DUART
+;   move.b  d1, (MC68681_Base+MC68681_W_THRA)
+;
+;   ; then, wait for tx to complete
+; .wait:
+;   ; read the status register, check TXRDY bit (2), loop while clear
+;   move.b  (MC68681_Base+MC68681_R_SRA), d0
+;   btst    #2, d0
+;   beq     .wait
+;   rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 09 - Reads a single character from the active TTY.
+;
+; NOTE:
+;   This call will block until a character arrives. Interrupts must be enabled
+;   or the call will deadlock.
+; INPUTS:
+;   d1: If bit 0 is set, don't wait for a character.
+; OUTPUTS:
+;   d0: Received character
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Getc:
+  movem.l d1/a1, -(sp)
+
+  ; load the queue for all
+  lea     UART_A_Queue, a1
+
+  ; if b it 0 is set, jump to the nonblocking call
+  btst    #0, d1
+  bne     .Nonblocking
+
+  ; we can block, so jump to the 68681 handler
+.ReadChar:
+  bsr     _MC68681_Getch
+
+  movem.l (sp)+, d1/a1
+  rts
+
+.Nonblocking:
+  ; is there a byte waiting in the buffer?
+  tst.b   UART_Queue_WritePtr(a1)
+  bne     .ReadChar ; if yes, read it
+
+  ; no byte available, exit
+
+.noByte:
+  moveq   #-1, d0
+
+  movem.l (sp)+, d1/a1
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0A - Reads a single character from the active TTY without blocking.
+;
+; NOTE:
+;   Interrupts must be enabled or the call will deadlock.
+; INPUTS:
+;   None
+; OUTPUTS:
+;   d0: Received character, or -1 if no character
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Getc_Nonblocking:
+  lea     (MC68681_Base), a0
+
+	; is there a byte?
+	move.b  MC68681_R_SRA(a0), d0
+	btst    #0, d0
+	beq.s		.NoCharacter
+
+	; read the byte
+	move.b	MC68681_R_RHRA(a0), d0
+
+  rts
+
+.NoCharacter:
+  moveq   #-1, d0
+  rts
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0B - Prints a null-terminated string to the TTY.
+;
+; INPUTS:
+;   a1: String to output
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Puts:
+  move.l  a1, a0
+  bra     Out_Puts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0C - Prints a hexadecimal number to the TTY with a given precision.
+;
+; INPUTS:
+;   d2: Number to output
+;   d3: Size of the number (1, 2, or 4)
+; OUTPUTS:
+;   d0: -1 if an argument was invalid, 0 otherwise.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_OutHex:
+  ; 4 bytes?
+  cmp.b   #4, d3
+  bne     .Check1
+
+  ; yup, so print a long
+  move.l  d2, d0
+  bsr     OutHex_Long
+  bra     .Done
+
+.Check1:
+  ; 1 byte?
+  cmp.b   #1, d3
+  bne     .Check2
+
+  ; yup, so print a byte
+  move.l  d2, d0
+  bsr     OutHex_Byte
+  bra     .Done
+
+.Check2:
+  ; 2 bytes?
+  cmp.b   #1, d3
+  bne     .InvalidSize
+
+  ; yup, so print a word
+  move.l  d2, d0
+  bsr     OutHex_Word
+  bra     .Done
+
+.Done:
+  ; done, clear d0
+  moveq   #0, d0
+  rts
+
+
+
+.InvalidSize:
+  moveq   #-1, d0
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0D - Reads a hexadecimal number from the TTY with a given precision.
+;
+; INPUTS:
+;   d3: Size of the number (1, 2, or 4)
+; OUTPUTS:
+;   d0: Number read from the terminal
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_InHex:
+  ; set up for terminal input
+  lea     getch, a0
+
+  ; 4 bytes?
+  cmp.b   #4, d3
+  bne     .Check1
+
+  ; yup, so read a long
+  bsr     InHex_Byte
+  bra     .Done
+
+.Check1:
+  ; 1 byte?
+  cmp.b   #1, d3
+  bne     .Check2
+
+  ; yup, so read a byte
+  bsr     InHex_Byte
+  bra     .Done
+
+.Check2:
+  ; 2 bytes?
+  cmp.b   #1, d3
+  bne     .InvalidSize
+
+  ; yup, so read a word
+  bsr     InHex_Byte
+  bra     .Done
+
+.Done:
+  rts
+
+
+
+.InvalidSize:
+  moveq   #-1, d0
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0E - Sets some TTY control states.
+;
+; INPUTS:
+;   d1: Bit 0 indicates echo state (set = on, clear = off)
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_TtySetAttribs:
+  ; do we want echo enabled?
+  btst    #0, d1
+  beq     .EchoDisabled
+
+  ; yep, so enable it
+  bsr     Echo_On
+  bra     .Done
+
+  ; nope, branch down here, it will be disabled.
+.EchoDisabled:
+  bsr     Echo_Off
+
+.Done:
+  moveq   #0, d0
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 0F - Decompresses data using LZ4 algorithm.
+;
+; INPUTS:
+;   a1: Compressed data
+;   a2: Output uncompressed data here. This must be big enough to fit all data
+; OUTPUTS:
+;   None
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Unpack_Lz4:
+  ; save the registers clobbered by LZ4
+  movem.l d0-d3/d5/d7/a0-a4, -(sp)
+
+  ; copy the input to a0 and output to a1, then decompress
+  move.l  a1, a0
+  move.l  a2, a1
+  bsr     Lib_LZ4
+
+  ; restore registers
+  movem.l (sp)+, d0-d3/d5/d7/a0-a4
+
+  ; the status is always success
+  moveq   #0, d0
+  rts
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; 10 - Gets the value of the system timer, in 100ths of a second.
+;
+; INPUTS:
+;   None
+; OUTPUTS:
+;   d0: Number read from the terminal
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Svc_Get_Ticks:
+  move.l  (Loader_Tick), d0
+  rts

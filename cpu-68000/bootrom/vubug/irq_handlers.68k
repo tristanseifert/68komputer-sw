@@ -1,0 +1,312 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; IRQ and trap handlers
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Installs the default set of vectors.
+RAM_Vector_Init:
+  ; disable interrupts now
+  move    sr, -(sp)
+  move    #$2700, sr
+
+  ; first, reset each vector to rte
+  lea     RAM_Vector_Irq_Uninitialized, a0
+  moveq   #((RAM_Vectors_End-RAM_Vectors_Start)/16)-1, d0
+
+  move.l  #$4E734E71, d1 ; rte/nop
+  move.l  #$4E714E71, d2 ; nop/nop
+
+.ClearLoop:
+  move.l  d1, (a0)+
+  move.l  d2, (a0)+
+  move.l  d2, (a0)+
+  move.l  d2, (a0)
+  dbf     d0, .ClearLoop
+
+  ; install our 68681 vector
+  lea     RAM_Vector_Irq2, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #MC68681_ISR, (a0)+
+
+  ; install the trap 0 (exit) handler
+  lea     RAM_Vector_Trap0, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #Svc_Exit_Trap, (a0)
+
+  ; install the trap 1 (loader services) handler
+  lea     RAM_Vector_Trap1, a0
+  move.w  #$4EF9, (a0)+
+  move.l  #Svc_Entry_Trap, (a0)
+
+  ; we've finished, re-enable interrupts
+  move    (sp)+, sr
+  rts
+
+.Jmp:
+  jmp     $12345678
+.Jsr:
+  jsr     $12345678
+.Nop:
+  nop
+
+; reserved exception handler, should never actually get called
+.Rte:
+Exception_Reserved:
+  rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Generic trap handler
+;
+Exception_Generic:
+ghlr:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  move.w  (a7)+, (_sr)
+  move.l  (a7)+, (_pc)
+
+  ; fake a return to command interpreter
+  pea     comm
+  move.w  ssri, -(a7)
+
+ghpr:
+  lea     Trap_WriteMsgWithPc_MsgTrap, a0
+
+Trap_WriteMsgWithPc:
+  ; RXRDY_B, break_A, RXRDY_A; then install our IRQ handler
+  ; move.b  #%00100110, (MC68681_Base+MC68681_W_IMR)
+  move.b  #%00101110, (MC68681_Base+MC68681_W_IMR) ; also adds timer ready
+
+  bsr     Out_Puts
+
+; ghpr1:  bsr     Out_Puts
+
+  ; print PC
+  move.l  (_pc), d0
+  bsr     OutHex_Long
+  rte
+
+Trap_WriteMsgWithPc_MsgTrap:
+  dc.b    lf,cr, $7
+  dc.b    "Trap at $", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Breakpoint handler
+;
+bhmes:
+  dc.b    lf,cr, $7
+  dc.b    "Breakpoint at $", nul
+
+binin:
+  dc.b    lf,cr, $7
+  dc.b    "Bad instruction at $", nul
+  even
+
+bhlr:
+  move.w  ssrn, sr                 ;disable interrupts
+  movem.l #$ffff, (dr0)              ;save registers d0-a7
+
+  move.l  usp, a6                  ;get and save user stack pointer
+  move.l  a6, (ar7)
+  move.w  (a7)+, (_sr)               ;save status register
+  move.l  (a7)+, (_pc)               ;save program counter
+  pea     comm                    ;set for return to comm
+  move.w  ssri, -(a7)              ;enable interrupts on return
+  movea.l (_pc), a0                  ;get pc on interrupt
+
+  ; was this interrupt caused by a breakpoint?
+  cmpi.w  #$ffff, (a0)
+  beq     .IsBkpt
+
+  ; no, it was an illegal instruction :(
+  lea     binin, a0
+  bra     Trap_WriteMsgWithPc
+
+.IsBkpt:
+  ; write breakpoint message and address of PC
+  lea     bhmes, a0
+  bsr     Out_Puts
+  move.l  (_pc), d0
+  bsr     OutHex_Address
+  bsr     crlf
+
+  ; search through the breakpoint table
+  lea     bktab-4, a1
+  moveq  #$4, d1
+  move.l  (_pc), d0
+
+.CheckBkpt:
+  adda.l  #$4, a1
+
+  ; compare the addresses
+  cmp.w   iloc(a1), d0
+  dbeq    d1, .CheckBkpt
+
+  ; did we find an entry?
+  bne     .Done
+
+  ; yup!
+  movea.w d0, a2
+  move.w  instr(a1), (a2)          ;move instruction back in
+  ori.w   #$8000, (_sr)              ;set trace mode on
+  bset    #0, (bkptf)               ;set in-bkpt flag
+
+.Done:
+  rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Trace handler
+;
+tlocm:  dc.b    lf,cr
+        dc.b    "PC == $", nul
+        dc.b    nul
+        even
+
+Exception_Trace:
+thlr:   move.w  ssrn,sr                 ;disable interrupts
+        move.l  a0,ar0                  ;save used registers
+        move.l  d0,dr0
+        move.l  a1,ar1
+        move.l  d1,dr1
+        move.l  a2,ar2
+        move.l  d2,dr2
+        btst    #$0,bkptf               ;Handling a breakpoint ?
+        beq     treal                   ;No, so its a real trace
+        movea.l _pc,a0                  ;Yes, find where it occurred
+        move.w  bkin,(a0)               ;reset the bkpt instruction
+        bclr    #$0,bkptf               ;clear in progress bkpt
+        btst    #$2,bkptf               ;In trace mode
+        bne     treal                   ;yes, go trace it
+thma0:  andi.w  #$7fff,(a7)             ;No, so clear the trace bit
+        bra     trte
+treal:  move.l  $2(a7),_pc              ;Not (just) a bkpt but trace or single
+        btst    #$1,bkptf               ;Trace ?
+        beq     trpr                    ;Yes
+        movem.l #$ffff,dr0              ;No,single-step d0-a7
+        move.l  usp,a6                  ;save registers and stack pointer
+        move.l  a6,ar7
+        move.w  (a7)+,_sr               ;save status register
+        move.l  (a7)+,_pc               ;save pc
+        pea     comm                    ;fake return to comm
+        move.w  ssri,-(a7)              ;enable interrupts on return
+trpr:   lea     tlocm,a0                ;wx message
+        bsr     Out_Puts
+
+        move.l  (_pc), d0
+        bsr     OutHex_Long
+        bsr     crlf
+        move.l  (_pc),a1                  ;load the current address
+        bsr     ass1                    ;wx the disassembled instruction
+trte:   movea.l ar0,a0                  ;restore used registers
+        move.l  dr0,d0
+        movea.l ar1,a1
+        move.l  dr1,d1
+        movea.l ar2,a2
+        move.l  dr2,d2
+tr:     rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Privilege Violation Handler
+;
+; See generic handler for details
+;
+Exception_Privilege:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  move.w  (a7)+, (_sr)
+  move.l  (a7)+, (_pc)
+
+  ; build a stack frame to return back to the interpreter
+  pea     comm
+  move.w  ssri, -(a7)
+
+  ; print the message
+  lea     .Msg, a0
+  bra     Trap_WriteMsgWithPc
+
+.Msg:
+  dc.b    lf,cr,$7
+  dc.b    "Privilege Error at $", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; address error/bus error trap
+;
+Exception_BusErr:
+  st.b    (Exception_WasBus)
+  bra     Exception_BusAddr_Handle
+
+Exception_Address:
+  sf.b    (Exception_WasBus)
+
+Exception_BusAddr_Handle:
+  ; back up all registers and the state of the user program
+  movem.l #$ffff, (dr0)
+  move.l  usp, a6
+  move.l  a6, (ar7)
+  ; the status and PC are deeper in the stack for an address or bus error
+  move.w  $8(a7), (_sr)
+  move.l  $a(a7), (_pc)
+  ; otherwise, continue as normal
+  pea     comm
+  move.w  ssri, -(a7)
+
+  ; was it a bus or an address error?
+  tst.b   (Exception_WasBus)
+  bne     .PrintBus
+
+.PrintAddr:
+  ; print message for address error
+  lea     .MsgAddr, a0
+  bra     Trap_WriteMsgWithPc
+
+.PrintBus:
+  ; print message for bus error
+  lea     .MsgBus, a0
+  bra     Trap_WriteMsgWithPc
+
+.MsgAddr:
+  dc.b    lf, cr, $7
+  dc.b    "Address error at $", nul
+
+.MsgBus:
+  dc.b    lf, cr, $7
+  dc.b    "Bus error at $", nul
+  even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Macro instruction handlers
+;
+;
+; Exit
+;
+Svc_Exit_Trap:
+  ; reset our stack (doesn't matter since we're returning anyways)
+  move.l  #stack, sp
+
+  ; print a message
+  ; lea     .MsgExit, a0
+  ; bsr     Out_Puts
+
+  ; wait for character to finish writing
+; .waitTxRdy:
+;   ; wait for TXRDY
+;   btst    #2, (MC68681_Base+MC68681_R_SRA)
+;   beq.s   .waitTxRdy
+
+  ; reset the 68681 (to fix it from any applications)
+  ; bsr     MC68681_Reset
+  ; then, jump to the restart handler
+  bra     VUBUG_Restart
+
+.MsgExit:
+  dc.b    cr, lf, $E, $60, $F, " Return to monitor", cr, lf, nul
+  even

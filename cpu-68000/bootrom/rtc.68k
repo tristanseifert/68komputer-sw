@@ -1,0 +1,377 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Routines for interfacing with the DS1244 and DS1744 RTC chips.
+;
+; The DS1244 is accessed serially through the least significant bit of the data
+; bus, after writing a 64-bit 'recognition sequence.' The clock's internal regs
+; are read/written as that whole 64-bit chunk.
+;
+; On the other hand, the DS1744 can be accessed through 8 registers at the top
+; of its address space.
+;
+; In either case, we reserve the last 8 bytes of the clock's NVRAM region for
+; writing/reading to registers.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Which type of RTC to use
+__RTC_DS1244:   EQU   0
+__RTC_DS1744:   EQU   1
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Resets and initializes the RTC.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RTC_Reset:
+  ; clear RTC memory
+  lea     (Loader_DateTimeBase), a0
+  moveq   #0, d0
+
+  rept 4
+  move.l  d0, (a0)+
+  endr
+
+RTC_Magic_Reset:
+  if      __RTC_DS1244
+__RTC_ResetMagic_DS1244:
+  ; read from the RTC at least 64 times to reset its internal state
+  lea     (RTC_Time_Reg), a0
+  moveq   #64, d0
+
+.ReadLoop:
+  move.b  (a0), d1
+  dbf     d0, .ReadLoop
+  endif
+
+  rts
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RTC_Read:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Reads a DS1277's time/date values.
+;
+; Clobbers:
+;   d0, a0-a1
+  if __RTC_DS1744
+__RTC_Read_DS1744:
+  lea     (RTC_Base), a0
+  lea     (Loader_DateTimeBase), a1
+
+  ; enter read mode
+  move.b  RTC_DS1744_Command(a0), d0
+  bset    #6, d0
+  move.b  d0, RTC_DS1744_Command(a0)
+
+  ; read century
+  move.b  RTC_DS1744_Century(a0), d0
+  and.b   #$3F, d0
+  move.b  d0, (a1)+
+
+  ; read year
+  move.b  RTC_DS1744_Year(a0), (a1)+
+  ; read month
+  move.b  RTC_DS1744_Month(a0), d0
+  and.b   #$1F, d0
+  move.b  d0, (a1)+
+  ; read day-of-month
+  move.b  RTC_DS1744_Date(a0), d0
+  and.b   #$3F, d0
+  move.b  d0, (a1)+
+  ; read day-of-week
+  move.b  RTC_DS1744_Day(a0), d0
+  and.b   #$07, d0
+  move.b  d0, (a1)+
+
+  ; read hours
+  move.b  RTC_DS1744_Hours(a0), d0
+  and.b   #$3F, d0
+  move.b  d0, (a1)+
+  ; read minutes
+  move.b  RTC_DS1744_Minutes(a0), d0
+  and.b   #$7F, d0
+  move.b  d0, (a1)+
+  ; read seconds
+  move.b  RTC_DS1744_Seconds(a0), d0
+  and.b   #$7F, d0
+  move.b  d0, (a1)+
+
+  ; milliseconds is always 0
+  move.b  #0, (a1)
+
+  ; exit read mode
+  move.b  RTC_DS1744_Command(a0), d0
+  and.b   #$3F, d0
+  move.b  d0, RTC_DS1744_Command(a0)
+
+  rts
+  endif
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Reads a DS1244's time/date values.
+;
+; Clobbers:
+;   d0-d3, a0-a1
+  if __RTC_DS1244
+__RTC_Read_DS1244:
+  ; write magic sequence
+  bsr     __RTC_ResetMagic_DS1244
+  bsr     __RTC_WriteMagic_DS1244
+
+  ; read 64 bits from clock
+  lea     (RTC_Time_Reg), a0
+  lea     (Loader_RTCBuffer), a1
+
+  moveq   #63, d0
+  moveq   #0, d2
+  moveq   #0, d3
+
+.ReadLoop:
+  ; Read from the clock and isolate the bit
+  move.b  (a0), d1
+  and.b   #$01, d1
+
+  ; shove it into the temporary variable
+  or.b    d1, d2
+  ror.b   #1, d2
+
+  ; have we read 8 bits?
+  addq.b  #1, d3
+  cmp.b   #8, d3
+  bne.s   .CheckNext
+
+  ; if so, store it, then reset counter
+  move.b  d2, (a1)+
+  moveq   #0, d2
+  moveq   #0, d3
+
+.CheckNext:
+  dbf     d0, .ReadLoop
+
+  ; convert the RAM buffer to the values we care about
+  lea     (Loader_RTCBuffer), a1
+
+  ; read milliseconds
+  move.b  (a1)+, d0
+  move.b  d0, (Loader_TimeMSeconds)
+  ; seconds
+  move.b  (a1)+, d0
+  and.b   #$7F, d0
+  move.b  d0, (Loader_TimeSeconds)
+  ; minutes
+  move.b  (a1)+, d0
+  and.b   #$7F, d0
+  move.b  d0, (Loader_TimeMinutes)
+  ; hours
+  move.b  (a1)+, d0
+  and.b   #$3F, d0
+  move.b  d0, (Loader_TimeHours)
+
+  ; day of week
+  move.b  (a1)+, d0
+  and.b   #$7, d0
+  move.b  d0, (Loader_DateDayOfWeek)
+  ; day of month
+  move.b  (a1)+, d0
+  and.b   #$3F, d0
+  move.b  d0, (Loader_DateDay)
+  ; month
+  move.b  (a1)+, d0
+  and.b   #$1F, d0
+  move.b  d0, (Loader_DateMonth)
+  ; year
+  move.b  (a1), d0
+  move.b  d0, (Loader_DateYear)
+
+  ; centuries are fixed at "20" (lol y2100 bug)
+  move.b  #$20, (Loader_DateCentury)
+
+  rts
+  endif
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RTC_Write:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Writes the DS1744's time/date values
+;
+; Clobbers:
+;   d0, a0-a1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  if      __RTC_DS1744
+__RTC_Write_DS1744:
+  lea     (RTC_Base), a0
+  lea     (Loader_DateTimeBase), a1
+
+  ; enter write mode
+  move.b  RTC_DS1744_Command(a0), d0
+  bset    #7, d0
+  move.b  d0, RTC_DS1744_Command(a0)
+
+  ; write the century (ensure write bit is set!)
+  move.b  (a1)+, d0
+  bset    #7, d0
+  move.b  d0, RTC_DS1744_Century(a0)
+  ; write year
+  move.b  (a1)+, RTC_DS1744_Year(a0)
+  ; write month
+  move.b  (a1)+, d0
+  and.b   #$1F, d0
+  move.b  d0, RTC_DS1744_Month(a0)
+  ; write day-of-month
+  move.b  (a1)+, d0
+  and.b   #$3F, d0
+  move.b  d0, RTC_DS1744_Date(a0)
+  ; write day-of-week
+  move.b  (a1)+, d0
+  and.b   #$07, d0
+  move.b  d0, RTC_DS1744_Day(a0)
+
+  ; write hours
+  move.b  (a1)+, d0
+  and.b   #$3F, d0
+  move.b  d0, RTC_DS1744_Hours(a0)
+  ; write minutes
+  move.b  (a1)+, d0
+  and.b   #$7F, d0
+  move.b  d0, RTC_DS1744_Minutes(a0)
+  ; write seconds (ensure /OSC is cleared)
+  move.b  (a1)+, d0
+  and.b   #$7F, d0
+  move.b  d0, RTC_DS1744_Seconds(a0)
+
+
+  ; exit write mode
+  move.b  RTC_DS1744_Command(a0), d0
+  and.b   #$3F, d0
+  move.b  d0, RTC_DS1744_Command(a0)
+
+  rts
+  endif
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Writes the DS1244's time/date values
+;
+; Clobbers:
+;   d0-d3, a0-a1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  if      __RTC_DS1244
+__RTC_Write_DS1244:
+  ; update RAM buffer
+  bsr     __RTC_UpdateBuffer_DS1244
+
+  ; write magic sequence
+  bsr     __RTC_ResetMagic_DS1244
+  bsr     __RTC_WriteMagic_DS1244
+
+  ; write 64 bits from buffer
+  lea     (RTC_Time_Reg), a0
+  lea     (Loader_RTCBuffer), a1
+
+  moveq   #63, d0
+
+.WriteLoop:
+  ; is this the start of a byte?
+  move.b  d0, d2
+  and.b   #$7, d2
+  bne     .notStart
+
+  ; if so, read the byte
+  move.b   (a1)+, d1
+
+.notStart:
+  ; write the bit to the RTC
+  move.b  d1, (a0)
+
+  ; shift bit
+  lsr.b   #1, d1
+  ; write next bit
+  dbf     d0, .WriteLoop
+  endif
+
+  rts
+
+  if __RTC_DS1244
+; Converts the in-memory values into the buffer that's written to the RTC.
+__RTC_UpdateBuffer_DS1244:
+  ; this is the buffer to write to
+  lea     Loader_RTCBuffer, a0
+
+  ; first, write the milliseconds
+  move.b  (Loader_TimeMSeconds), (a0)+
+
+  ; then, the seconds
+  move.b  (Loader_TimeSeconds), d0
+  and.b   #$7F, d0
+  move.b  d0, (a0)+
+
+  ; then, minutes
+  move.b  (Loader_TimeMinutes), d0
+  and.b   #$7F, d0
+  move.b  d0, (a0)+
+
+  ; next up, the hours: clear the 12 hour flag as well
+  move.b  (Loader_TimeHours), d0
+  and.b   #$3F, d0
+  move.b  d0, (a0)+
+
+  ; now, the day of week. make sure that the oscillator bit is cleared, but
+  ; reset bit is set (such that reset pin is ignored)
+  move.b  (Loader_DateDayOfWeek), d0
+  and.b   #$07, d0
+  or.b    #$10, d0
+  move.b  d0, (a0)+
+
+  ; write the day of month
+  move.b  (Loader_DateDay), d0
+  and.b   #$3F, d0
+  move.b  d0, (a0)+
+
+  ; write the month
+  move.b  (Loader_DateMonth), d0
+  and.b   #$1F, d0
+  move.b  d0, (a0)+
+
+  ; write the year
+  move.b  (Loader_DateYear), (a0)
+  rts
+  endif
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Writes the 64-bit recognition sequence to the RTC so that we can access the
+; registers.
+;
+; Clobbers:
+;   d0-d2, a0-a1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  if __RTC_DS1244
+__RTC_WriteMagic_DS1244:
+  lea     (RTC_Time_Reg), a0
+  lea     RTC_MagicSeq, a1
+
+  moveq   #0, d1
+  moveq   #63, d0
+
+.WriteLoop:
+  ; is this the start of a byte?
+  move.b  d0, d2
+  and.b   #$7, d2
+  cmp.b   #$7, d2
+  bne.s   .notStart
+
+  ; if so, read the byte
+  move.b   (a1)+, d1
+
+.notStart:
+  ; write the bit
+  move.b  d1, (a0)
+
+  ; shift bit
+  lsr.b   #1, d1
+  ; write next bit
+  dbf     d0, .WriteLoop
+
+  rts
+
+RTC_MagicSeq:
+  dc.b    $C5, $3A, $A3, $5C, $C5, $3A, $A3, $5C
+  even
+  endif

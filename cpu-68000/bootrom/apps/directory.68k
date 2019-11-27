@@ -1,0 +1,45 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This file contains the application directory and the application data itself,
+; stored at $8000 in the ROM.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  include "../hardware.68k"
+
+  org     $8000
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Application directory
+App_Dir:
+  dc.l    App_Basic
+  dc.l    App_Config
+  dc.l    0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; include the rest of our apps
+; align   8
+
+App_Basic:
+  dc.b    "BLAZ"
+  dc.b    $80, 0, 0, 0
+
+  ; source data, dest address
+  dc.l    App_Basic_Data, RAM_LZ4_App_Base
+  ; run address
+  dc.l    RAM_LZ4_App_Base
+
+App_Config:
+  dc.b    "BLAZ"
+  dc.b    $80, 0, 0, 0
+
+  ; source data, dest address
+  dc.l    App_Config_Data, $00082000
+  ; run address
+  dc.l    $00082000
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+App_Basic_Data:
+  incbin  "ebasic.bin.lz4"
+  even
+
+App_Config_Data:
+  incbin  "config.bin.lz4"
+  even

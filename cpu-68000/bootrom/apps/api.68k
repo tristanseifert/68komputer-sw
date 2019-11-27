@@ -1,0 +1,60 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; This include can be used to work with app directories, and assist in loading
+; apps.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Given a pointer to an app struct, it loads the app, then returns the address
+; of its entry point.
+;
+; INPUTS:
+;   a0: App header
+; OUTPUTS:
+;   a0: App entry point, or NULL
+; CLOBBERS:
+;   a0, d0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+App_Load:
+  ; check for the magic value
+  cmp.l   #'BLAZ', (a0)
+  bne.s   .Failed
+
+  ; does the type value indicate LZ4 compression?
+  move.b  4(a0), d0
+
+  btst    #7, d0
+  beq     .NoCompression
+
+  ; perform decompression with LZ4
+  move.l  a0, a2
+
+  movem.l d0-d3/d5/d7/a0-a4, -(sp)
+
+  move.l  8(a2), a0
+  move.l  12(a2), a1
+  bsr     Lib_LZ4
+
+  movem.l (sp)+, d0-d3/d5/d7/a0-a4
+
+  ; move.l  a2, a0
+
+  ; finished
+  bra     .AppLoaded
+
+.NoCompression:
+  ; XXX: implement this
+  nop
+
+.AppLoaded:
+  ; return the run address
+  move.l  16(a0), a0
+
+.Done:
+  rts
+
+
+; in case of failure, clear a0
+.Failed:
+  moveq   #0, d0
+  move.l  d0, a0
+  rts
