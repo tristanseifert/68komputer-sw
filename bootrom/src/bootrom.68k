@@ -1,0 +1,142 @@
+    org         $0
+
+    include     "memory.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    dc.l        Stack_Bottom, ResetEntry
+    dc.l        Vec_BusError, Vec_AddressError, Vec_IllegalInstruction, Vec_ZeroDivide
+    dc.l        Vec_ChkInstruction, Vec_TrapV, Vec_PrivilegeViolation, Vec_Trace
+    dc.l        Vec_Line1010, Vec_Line1111, Vec_0C, Vec_0D
+    dc.l        Vec_0E, Vec_UninitializedIrqVec
+    dc.l        Vec_10, Vec_11, Vec_12, Vec_13
+    dc.l        Vec_14, Vec_15, Vec_16, Vec_17
+    dc.l        Vec_SpuriousIrq, Vec_Lvl1Irq, Vec_Lvl2Irq, Vec_Lvl3Irq
+    dc.l        Vec_Lvl4Irq, Vec_Lvl5Irq, Vec_Lvl6Irq, Vec_NMI
+    dc.l        Vec_Trap0, Vec_Trap1, Vec_Trap2, Vec_Trap3
+    dc.l        Vec_Trap4, Vec_Trap5, Vec_Trap6, Vec_Trap7
+    dc.l        Vec_Trap8, Vec_Trap9, Vec_Trap10, Vec_Trap11
+    dc.l        Vec_Trap12, Vec_Trap13, Vec_Trap14, RomSvcTrap
+    dc.l        Vec_30, Vec_31, Vec_32, Vec_33
+    dc.l        Vec_34, Vec_35, Vec_36, Vec_37
+    dc.l        Vec_38, Vec_39, Vec_3A, Vec_3B
+    dc.l        Vec_3C, Vec_3D, Vec_3E, Vec_3F
+    dc.l        Vec_User0, Vec_User1, Vec_User2, Vec_User3
+    dc.l        Vec_User4, Vec_User5, Vec_User6, Vec_User7
+    dc.l        Vec_User8, Vec_User9, Vec_User10, Vec_User11
+    dc.l        Vec_User12, Vec_User13, Vec_User14, Vec_User15
+    dc.l        Vec_User16, Vec_User17, Vec_User18, Vec_User19
+    dc.l        Vec_User20, Vec_User21, Vec_User22, Vec_User23
+    dc.l        Vec_User24, Vec_User25, Vec_User26, Vec_User27
+    dc.l        Vec_User28, Vec_User29, Vec_User30, Vec_User31
+    ; there are technically 160 "user vectors" that space is allocated for in
+    ; the vector table. only the first 32 are changeable, all others (except
+    ; for the last 16, which are reserved for use by the loader) are stubbed
+    ; out and will cause an error
+    rept 144
+    dc.l        Vec_UserOutOfRange
+    endr
+    ; user interrupt vectors for boot ROM use
+    dc.l        DUART_ISR
+    rept        15
+    dc.l        Vec_UserOutOfRange
+    endr
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Entry point
+;
+; This performs basic initialization of hardware, and checks if this is a cold
+; or a warm boot and acts accordingly.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ResetEntry:
+    move        #$2700, sr
+
+    ; is this a cold boot?
+    cmp.w       #'YE', (ColdBoot_Flag).w
+    bne.s       ColdBootEntry
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Warm boot entry point; this essentially just skips clearing RAM and doing the
+; more time consuming hardware initialization.
+WarmBootEntry:
+    move.b      #1, (Reset_Reason).w
+    bra.w       CommonInit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Cold boot entry point
+ColdBootEntry:
+    ; clear the on-board RAM
+    lea         ($FFF00000), a0
+    moveq       #0, d0
+
+    move.w      #((1024*1024)/32)-1, d1
+
+.loop:
+    rept 8
+    move.l      d0, (a0)+
+    endr
+    dbf         d1, .loop
+
+    ; set the flag indicating we've warm booted
+    move.w      #'YE', (ColdBoot_Flag).w
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Common initialization for the boot ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+CommonInit:
+    bsr         InstallIrqHandlers
+    bsr         DUART_Init
+
+    ; print sign on banner (including whether this was a cold or warm reset)
+    lea         .MsgBanner(pc), a0
+    bsr.w       Console_Puts
+    lea         .MsgResetReason(pc), a0
+    bsr.w       Console_Puts
+
+    move.b      (Reset_Reason).w, d0
+    add.w       d0, d0
+
+    lea         ResetReasonStrTable(pc), a0
+    move.w      (a0, d0.w), d0
+    lea         (a0, d0.w), a0
+
+    bsr.w       Console_Puts
+
+.shit:
+    ; TODO: Enable IRQs and jump to the main function
+    ;andi.w      #$20FF, sr
+    bra         .shit
+
+.MsgBanner:
+    dc.b        "68komputer ROM Monitor (v0.1)\r\n",0
+.MsgResetReason:
+    dc.b        "Reset reason: ", 0
+
+ResetReasonStrTable:
+    dc.w        .MsgColdBoot-ResetReasonStrTable
+    dc.w        .MsgWarmBoot-ResetReasonStrTable
+
+.MsgColdBoot:
+    dc.b        "Cold boot\r\n", 0
+.MsgWarmBoot:
+    dc.b        "Warm boot\r\n", 0
+    even
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Include the various subcomponents of the boot ROM
+    include     "duart.68k"
+    include     "irqs.68k"
+
+    include     "console.68k"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Version information
+Version_BuildDate:
+    incbin      "builddate.txt"
+    dc.b        0
+Version_Commit:
+    incbin      "commit.txt"
+    dc.b        0
+
+    even

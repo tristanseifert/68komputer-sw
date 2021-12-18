@@ -1,0 +1,89 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Memory layout for the reserved RAM region for the boot ROM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Data_Start                      = $FFFFE000
+Data_Length                     = $2000
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Interrupt vectors (in RAM)
+Vectors_Base                    = Data_Start
+Vec_BusError                    = Vectors_Base+( 0*8)
+Vec_AddressError                = Vectors_Base+( 1*8)
+Vec_IllegalInstruction          = Vectors_Base+( 2*8)
+Vec_ZeroDivide                  = Vectors_Base+( 3*8)
+Vec_ChkInstruction              = Vectors_Base+( 4*8)
+Vec_TrapV                       = Vectors_Base+( 5*8)
+Vec_PrivilegeViolation          = Vectors_Base+( 6*8)
+Vec_Trace                       = Vectors_Base+( 7*8)
+Vec_Line1010                    = Vectors_Base+( 8*8)
+Vec_Line1111                    = Vectors_Base+( 9*8)
+Vec_UninitializedIrqVec         = Vectors_Base+(10*8)
+Vec_SpuriousIrq                 = Vectors_Base+(11*8)
+Vec_Lvl1Irq                     = Vectors_Base+(12*8)
+Vec_Lvl2Irq                     = Vectors_Base+(13*8)
+Vec_Lvl3Irq                     = Vectors_Base+(14*8)
+Vec_Trap0                       = Vectors_Base+(15*8)
+Vec_Trap1                       = Vectors_Base+(16*8)
+Vec_Trap2                       = Vectors_Base+(17*8)
+Vec_Trap3                       = Vectors_Base+(18*8)
+Vec_Trap4                       = Vectors_Base+(19*8)
+Vec_Trap5                       = Vectors_Base+(20*8)
+Vec_Trap6                       = Vectors_Base+(21*8)
+Vec_Trap7                       = Vectors_Base+(22*8)
+Vec_Trap8                       = Vectors_Base+(23*8)
+Vec_Trap9                       = Vectors_Base+(24*8)
+Vec_Trap10                      = Vectors_Base+(25*8)
+Vec_Trap11                      = Vectors_Base+(26*8)
+Vec_Trap12                      = Vectors_Base+(27*8)
+Vec_Trap13                      = Vectors_Base+(28*8)
+Vec_Trap14                      = Vectors_Base+(29*8)
+Vec_User0                       = Vectors_Base+(31*8)
+Vec_User1                       = Vectors_Base+(32*8)
+Vec_User2                       = Vectors_Base+(33*8)
+Vec_User3                       = Vectors_Base+(34*8)
+Vec_User4                       = Vectors_Base+(35*8)
+Vec_User5                       = Vectors_Base+(36*8)
+Vec_User6                       = Vectors_Base+(37*8)
+Vec_User7                       = Vectors_Base+(38*8)
+Vec_User8                       = Vectors_Base+(39*8)
+Vec_User9                       = Vectors_Base+(40*8)
+Vec_User10                      = Vectors_Base+(41*8)
+Vec_User11                      = Vectors_Base+(42*8)
+Vec_User12                      = Vectors_Base+(43*8)
+Vec_User13                      = Vectors_Base+(44*8)
+Vec_User14                      = Vectors_Base+(45*8)
+Vec_User15                      = Vectors_Base+(46*8)
+Vec_User16                      = Vectors_Base+(47*8)
+Vec_User17                      = Vectors_Base+(48*8)
+Vec_User18                      = Vectors_Base+(49*8)
+Vec_User19                      = Vectors_Base+(50*8)
+Vec_User20                      = Vectors_Base+(51*8)
+Vec_User21                      = Vectors_Base+(52*8)
+Vec_User22                      = Vectors_Base+(53*8)
+Vec_User23                      = Vectors_Base+(54*8)
+Vec_User24                      = Vectors_Base+(55*8)
+Vec_User25                      = Vectors_Base+(56*8)
+Vec_User26                      = Vectors_Base+(57*8)
+Vec_User27                      = Vectors_Base+(58*8)
+Vec_User28                      = Vectors_Base+(59*8)
+Vec_User29                      = Vectors_Base+(60*8)
+Vec_User30                      = Vectors_Base+(61*8)
+Vec_User31                      = Vectors_Base+(62*8)
+Vec_User32                      = Vectors_Base+(63*8)
+
+Vectors_End                     = Vectors_Base+(64*8)
+
+; Current time (in increments of 10ms, longword)
+Current_Ticks                   = Data_Start+$200
+; Why the system was reset: 0 = booted, 1 = warm reset
+Reset_Reason                    = Data_Start+$204
+
+; Boot ROM's stack
+Stack_Size                      = $200
+Stack_Top                       = Data_Start+Data_Length-16-Stack_Size
+Stack_Bottom                    = Stack_Top+Stack_Size
+
+; Flag written to 'YE' once the system has done one cold boot
+ColdBoot_Flag                   = Stack_Bottom + 14
+

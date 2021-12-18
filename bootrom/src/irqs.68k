@@ -1,0 +1,90 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Implementations of interrupt handlers and methods required to register them
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Generates a reserved vector handler, given a vector number
+    macro       ReservedVec
+Vec_\1:
+    moveq       #$\1, d0
+    bra.w       Vec_Reserved
+    endm
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Stubs for various reserved vectors. Under normal circumstances, these should _never_ actually be
+; executed, but we have special cases so we can identify which reserved vector was invoked.
+    ReservedVec         0C
+    ReservedVec         0D
+; This is "format error" for the 68010
+    ReservedVec         0E
+
+    ReservedVec         10
+    ReservedVec         11
+    ReservedVec         12
+    ReservedVec         13
+    ReservedVec         14
+    ReservedVec         15
+    ReservedVec         16
+    ReservedVec         17
+
+    ReservedVec         30
+    ReservedVec         31
+    ReservedVec         32
+    ReservedVec         33
+    ReservedVec         34
+    ReservedVec         35
+    ReservedVec         36
+    ReservedVec         37
+    ReservedVec         38
+    ReservedVec         39
+    ReservedVec         3A
+    ReservedVec         3B
+    ReservedVec         3C
+    ReservedVec         3D
+    ReservedVec         3E
+    ReservedVec         3F
+
+; Level 4-6 IRQs are never autovectored
+Vec_Lvl4Irq:
+    moveq       #$1C, d0
+    bra.w       Vec_Reserved
+Vec_Lvl5Irq:
+    moveq       #$1D, d0
+    bra.w       Vec_Reserved
+Vec_Lvl6Irq:
+    moveq       #$1E, d0
+    bra.w       Vec_Reserved
+
+; An user-defined interrupt vector is out of range
+Vec_UserOutOfRange:
+    moveq       #-1, d0
+    bra.w       Vec_Reserved
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Handler for a reserved vector
+Vec_Reserved:
+    ; TODO: implement
+    bra.s       Vec_Reserved
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Non-maskable interrupt (programmer's button)
+Vec_NMI:
+    ; TODO: implement (return to boot ROM prompt)
+    bra.s       Vec_NMI
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Entry to the boot ROM services
+RomSvcTrap:
+    ; TODO: implement (service number in d0.w)
+    moveq       #-1, d0
+    rte
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Initializes interrupt vectors
+InstallIrqHandlers:
+    ; install default error handlers
+
+    ; install stub trap handlers
+
+    ; install user interrupt vectors
+    rts
+
