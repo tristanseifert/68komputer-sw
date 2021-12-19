@@ -42,7 +42,7 @@ romentry:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .common:
     ; set up C runtime (copy .data)
-    lea         shit, a0
+    lea         shit(pc), a0
     bsr.w       Console_Puts
 
     ; set up drivers/hardware

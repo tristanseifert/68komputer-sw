@@ -35,7 +35,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     add_compile_options(-Wall -Wextra -Wmissing-declarations -Wformat=2 -Wcast-qual
         -fdiagnostics-color=always -Wwrite-strings -Wimplicit-fallthrough
-        -Wno-unused-private-field -Wno-undef -Wno-unused-command-line-argument)
+        -Wno-unused-private-field -Wno-undef -Wno-unused-command-line-argument
+        -Wno-unused-but-set-variable)
     add_compile_options(-Werror)
 else()
     message(FATAL_ERROR "We do not know what C/C++ warning flags to use for compiler '${CMAKE_CXX_COMPILER_ID}'!")

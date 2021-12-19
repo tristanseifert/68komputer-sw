@@ -2,6 +2,8 @@
 
 using namespace hw;
 
+#define REG(x) (reinterpret_cast<volatile uint8_t *>(Xr68C681::kBaseAddr) + static_cast<uint8_t>(Xr68C681::Reg::x))
+
 /**
  * Resets the DUART and configures registers with default values.
  *
@@ -21,7 +23,7 @@ void Xr68C681::Reset() {
  */
 void Xr68C681::PutCharA(char ch) {
     // wait for TXRDY
-    while(!(*GetReg(Reg::SRA) & ChannelStatus::TxReady)) {}
-    *GetReg(Reg::THRA) = ch;
+    while(!(*REG(SRA) & ChannelStatus::TxReady)) {}
+    *REG(THRA) = ch;
 }
 
