@@ -1,9 +1,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Memory layout for the reserved RAM region for the boot ROM
+;
+; Note that most of this region is reserved for the C++ component that's linked
+; into the ROM later. The assembler stubs in the ROM don't actually do very
+; much.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-Data_Start                      = $FFFFE000
-Data_Length                     = $2000
+Data_Start                      = $FFFFFB00
+Data_Length                     = $500
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Interrupt vectors (in RAM)

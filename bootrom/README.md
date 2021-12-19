@@ -7,9 +7,10 @@ To call into the ROM and take advantage of its services from a program, execute 
 Additionally, an NMI will _always_ drop into the boot ROM.
 
 ## Hardware Requirements
-For the Boot ROM, really only the DUART, I2C and NVRAM chips are of interest. Additionally, the top 8K of RAM are reserved for exclusive use by the ROM.
+For the Boot ROM, really only the DUART, I2C and NVRAM chips are of interest. Additionally, the top 16K of RAM are reserved for exclusive use by the ROM.
 
-- $FFE000 - $FFE1FF: Interrupt vectors
+- $FFC000 - $FFFAFF: Reserved for .bss/.data of runtime
+- $FFFB00 - $FFFCFF: Interrupt vectors
     - Each vector is allocated 8 bytes; sufficient for an absolute 32-bit jump to a handler routine.
     - Vector assignments are as follows (multiply by 8 and add to base to get its address):
         - 0: Bus error
@@ -30,5 +31,4 @@ For the Boot ROM, really only the DUART, I2C and NVRAM chips are of interest. Ad
         - 15..29: TRAP vector 0-14
         - 30: Reserved
         - 31..63: User interrupt vectors (starting with vector $40)
-- $FFE200 - $FFFDFF: Reserved
 - $FFFE00 - $FFFFFF: Supervisor stack
