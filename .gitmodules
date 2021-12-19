@@ -13,3 +13,6 @@
 [submodule "cpu-68008/c/stdlib/platform/umm_malloc"]
 	path = cpu-68008/c/stdlib/platform/umm_malloc
 	url = git@github.com:rhempel/umm_malloc.git
+[submodule "bootrom++/external/printf"]
+	path = bootrom++/external/printf
+	url = git@github.com:mpaland/printf.git

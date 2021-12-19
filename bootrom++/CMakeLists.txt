@@ -34,9 +34,35 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         -Wno-unused-private-field -Wno-undef -Wno-unused-command-line-argument
         -Wno-unused-but-set-variable)
     add_compile_options(-Werror)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    add_compile_options(-Wall -Wextra -Wmissing-declarations -Wformat=2 -Wcast-qual
+        -fdiagnostics-color=always -Wwrite-strings -Wimplicit-fallthrough
+        -Wno-undef -Wno-unused-but-set-variable -Wno-unknown-pragmas)
+    add_compile_options(-Werror)
 else()
     message(FATAL_ERROR "We do not know what C/C++ warning flags to use for compiler '${CMAKE_CXX_COMPILER_ID}'!")
 endif()
+
+# use the freestanding baremetal stuff
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    add_compile_options(-ffreestanding -mcpu=M68000)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    add_compile_options(-ffreestanding -mcpu=68000)
+else()
+    message(FATAL_ERROR "We do not know what C/C++ flags to use for compiler '${CMAKE_CXX_COMPILER_ID}'!")
+endif()
+
+# external libraries
+add_subdirectory(external)
+
+# external components
+add_library(runtime OBJECT
+    src/runtime/math/_mulsi3.c
+    src/runtime/math/_udivmodsi4.c
+    src/runtime/math/_udivsi3.c
+    src/runtime/math/_umodsi3.c
+)
+target_compile_options(runtime PRIVATE -Wno-missing-declarations)
 
 # build the ROM
 add_executable(bootrom
@@ -49,8 +75,8 @@ add_executable(bootrom
     src/hw/Xr68c681.cpp
 )
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
-
-target_compile_options(bootrom PRIVATE -fno-rtti -ffreestanding -mcpu=M68000)
+target_link_libraries(bootrom PRIVATE printf runtime)
+target_compile_options(bootrom PRIVATE -fno-rtti)
 target_link_options(bootrom PRIVATE -static -nostdlib -nostartfiles)
 
 # we have to use a custom linker script

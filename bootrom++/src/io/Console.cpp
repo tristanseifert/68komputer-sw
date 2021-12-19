@@ -1,6 +1,8 @@
 #include "Console.h"
 #include "hw/Xr68c681.h"
 
+#include <printf.h>
+
 /**
  * Writes a string to the console.
  */
