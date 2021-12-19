@@ -14,10 +14,6 @@ SET(CMAKE_ASM_COMPILE_OBJECT
     "<CMAKE_ASM_COMPILER> -Felf -m68000 -esc -spaces -o <OBJECT> <SOURCE>"
 )
 
-### use lld for linking, rather than ld
-### NOTE: This requires patches to lld for 68k support
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
-
 ### required modules
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
@@ -35,7 +31,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     add_compile_options(-Wall -Wextra -Wmissing-declarations -Wformat=2 -Wcast-qual
         -fdiagnostics-color=always -Wwrite-strings -Wimplicit-fallthrough
-        -Wno-unused-private-field -Wno-undef -Wno-unused-command-line-argument)
+        -Wno-unused-private-field -Wno-undef -Wno-unused-command-line-argument
+        -Wno-unused-but-set-variable)
     add_compile_options(-Werror)
 else()
     message(FATAL_ERROR "We do not know what C/C++ warning flags to use for compiler '${CMAKE_CXX_COMPILER_ID}'!")
@@ -54,11 +51,10 @@ add_executable(bootrom
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
 target_compile_options(bootrom PRIVATE -fno-rtti -ffreestanding -mcpu=M68000)
-target_link_options(bootrom PRIVATE -mcpu=M68000)
-target_link_options(bootrom PRIVATE -static -nostdlib -ffreestanding)
+target_link_options(bootrom PRIVATE -static -nostdlib -nostartfiles)
 
 # we have to use a custom linker script
-target_link_options(bootrom PRIVATE "-Wl,-T${CMAKE_CURRENT_LIST_DIR}/bootrom.ld")
+target_link_options(bootrom PRIVATE "-T${CMAKE_CURRENT_LIST_DIR}/bootrom.ld")
 set_target_properties(bootrom PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/bootrom.ld)
 
 # after building, extract the .text section and save it as a raw binary
