@@ -1,4 +1,5 @@
 ENTRY(romentry)
+OUTPUT_ARCH(m68k)
 
 MEMORY { 
     ROM (rx)  : ORIGIN = 0, LENGTH = 1M

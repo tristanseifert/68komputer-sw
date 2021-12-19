@@ -24,10 +24,8 @@ class Xr68C681 {
         static void PutCharA(char ch);
         static void PutCharB(char ch);
 
-    private:
         Xr68C681() = delete;
 
-    private:
         /**
          * Names of registers in the DUART
          *
@@ -84,17 +82,5 @@ class Xr68C681 {
           * register.
           */
         static const constexpr uintptr_t kBaseAddr{0x130001};
-
-        /**
-         * Returns the address of the nth register. This assumes that the DUART is only on one
-         * of the bytes on the bus.
-         *
-         * @param reg Register to access
-         *
-         * @return Byte aligned address of the specified DUART register
-         */
-        static inline auto GetReg(const Reg reg) {
-            return reinterpret_cast<volatile uint8_t *>(kBaseAddr) + static_cast<uint8_t>(reg);
-        }
 };
 }

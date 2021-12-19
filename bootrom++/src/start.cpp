@@ -8,6 +8,7 @@
  */
 extern "C" void bootrom_start() {
     Console::Puts("Yo what's up\r\n");
+    Console::Puts("Today were going to smoke weed\r\n");
 
     // XXX: infinite loop
     for(;;) {}
