@@ -1,6 +1,9 @@
 #include "hw.h"
 #include "Xr68c681.h"
 
+#include "io/Console.h"
+#include "vector/table.h"
+
 using namespace hw;
 
 /**
@@ -8,6 +11,11 @@ using namespace hw;
  * handling is invoked.
  */
 void hw_init() {
+    // initialize interrupt handling and console
+    Vectors::InitTrampolines();
+    Console::Init();
+
+    // then, initialize hardware
     Xr68C681::Reset();
 }
 

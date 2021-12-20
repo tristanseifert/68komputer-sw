@@ -5,6 +5,9 @@
 
 class Console {
     public:
-        static void Puts(const char *);
-        static void Print(const char* format, ...);
+        static void Init();
+
+        static void Put(const char ch);
+        static void Put(const char *);
+        static int Print(const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 };

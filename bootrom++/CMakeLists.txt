@@ -86,4 +86,4 @@ set_target_properties(bootrom PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/
 # after building, extract the .text section and save it as a raw binary
 find_program(CMAKE_OBJCOPY objcopy)
 add_custom_command(TARGET bootrom POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O binary --only-section=.text $<TARGET_FILE:bootrom> ${CMAKE_CURRENT_BINARY_DIR}/bootrom.bin)
+    COMMAND ${CMAKE_OBJCOPY} -O binary --only-section=.text --only-section=.data $<TARGET_FILE:bootrom> ${CMAKE_CURRENT_BINARY_DIR}/bootrom.bin)

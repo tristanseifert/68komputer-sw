@@ -12,23 +12,39 @@ SECTIONS {
     __text_start = .;
     .text : {
         *(.vectors .vectors*)
-        *(.text .text.* CODE*)
-        *(.rodata .rodata.*)
+        *(CODE*)
+        *(.text .text.*)
+        *(.rodata .rodata*)
     } > ROM
     __text_end = .;
 
-    __data_start = .;
-    .data : ALIGN(16) {
+    /* location of the .data segment to copy from ROM */
+    __data_rom_start = .;
+    .data : {
+        /* start of .data in RAM */
+        __data_ram_start = .;
         *(*.data .data.*)
+        /* end of .data in RAM */
+        __data_ram_end = .;
     } > RAM AT >ROM
-    __data_end = .;
+    /* total bytes of .data to copy from ROM */
+    PROVIDE(__data_rom_size = __data_ram_end - __data_ram_start);
+    /* total dwords of data to copy, minus 1 (for use as a loop counter) */
+    PROVIDE(__data_rom_dwords = ((__data_ram_end - __data_ram_start) / 4) - 1);
 
-    __bss_start = .;
-    .bss (NOLOAD) : ALIGN(16) {
+    .bss (NOLOAD) : ALIGN(4) {
+        /* start of .bss in RAM */
+        __bss_start = .;
         *(.bss .bss.*)
         *(COMMON)
+        /* end of .bss in RAM */
+        __bss_end = .;
     } > RAM
-    __bss_end = .;
+    /* total bytes of .bss in RAM to clear */
+    PROVIDE(__bss_size = __bss_end - __bss_start);
+    /* number of dwords, minus 1, of bss (for use as a loop counter) */
+    PROVIDE(__bss_dwords = ((__bss_end - __bss_start) / 4));
 
+    /* put the stack at the very end of RAM */
     PROVIDE(_stack_ptr = ORIGIN(RAM) + LENGTH(RAM));
 }

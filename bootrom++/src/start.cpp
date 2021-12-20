@@ -1,5 +1,9 @@
 #include "io/Console.h"
 
+#include <stdint.h>
+
+#include <printf.h>
+
 extern "C" void bootrom_start();
 
 /**
@@ -9,8 +13,9 @@ extern "C" void bootrom_start();
  * out whether we should look for an application to boot, or drop into the boot ROM monitor.
  */
 void bootrom_start() {
-    Console::Puts("Yo what's up\r\n");
-    Console::Puts("Today were going to smoke weed\r\n");
+    Console::Put("Yo what's up, today were going to smoke weed\r\n");
+
+    Console::Print("Kush number = %d\r\n", 420);
 
     // XXX: infinite loop
     for(;;) {}

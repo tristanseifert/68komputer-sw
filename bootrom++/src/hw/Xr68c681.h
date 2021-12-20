@@ -18,6 +18,9 @@ namespace hw {
  * bus.
  */
 class Xr68C681 {
+    protected:
+        static void HandleIrq();
+
     public:
         static void Reset();
 
@@ -47,6 +50,46 @@ class Xr68C681 {
             RHRA                        = (0x3 * 2),
             ///  W - Channel A transmit holding register/FIFO
             THRA                        = (0x3 * 2),
+            ///  R - Input port change register
+            IPCR                        = (0x4 * 2),
+            ///  W - Auxiliary control register
+            ACR                         = (0x4 * 2),
+            ///  R - Interrupt status register
+            ISR                         = (0x5 * 2),
+            ///  W - Interrupt mask register
+            IMR                         = (0x5 * 2),
+            /// RW - Counter/timer upper byte
+            CTU                         = (0x6 * 2),
+            /// RW - Counter/timer lower byte
+            CTL                         = (0x7 * 2),
+
+            /// RW - MR{1,2}B: Channel B mode register
+            MRnB                        = (0x8 * 2),
+            ///  W - Channel B clock select register
+            CSRB                        = (0x9 * 2),
+            ///  R - Channel B status register
+            SRB                         = (0x9 * 2),
+            ///  W - Channel B command register
+            CRB                         = (0xA * 2),
+            ///  R - Channel B receive holding register/FIFO
+            RHRB                        = (0xB * 2),
+            ///  W - Channel B transmit holding register/FIFO
+            THRB                        = (0xB * 2),
+
+            /// RW - Interrupt vector register
+            IVR                         = (0xC * 2),
+            ///  R - Input port
+            IP                          = (0xD * 2),
+            ///  W - Output port configuration register
+            OPCR                        = (0xD * 2),
+            ///  R - Start counter/timer command
+            SCC                         = (0xE * 2),
+            ///  W - Set output port bits command
+            SOPBC                       = (0xE * 2),
+            ///  R - Stop counter/timer command
+            STC                         = (0xF * 2),
+            ///  W - Clear output port bits command
+            COPBC                       = (0xF * 2),
 
             /// Sentinel value indicating end of register list
             End                         = (0x10 * 2),
@@ -82,5 +125,41 @@ class Xr68C681 {
           * register.
           */
         static const constexpr uintptr_t kBaseAddr{0x130001};
+
+        /**
+         * Interrupt vector reserved for use by the DUART. The ROM only makes use of this to update
+         * the timer tick count.
+         */
+        static const constexpr uint8_t kIrqVector{0xF0};
+
+    private:
+        /// A single register write transaction
+        struct RegInfo {
+            Reg index;
+            uint8_t value{0};
+        };
+
+        /// Creates a register initialization record
+        static inline constexpr RegInfo MakeRegister(const Reg index, const uint8_t value) {
+            return {
+                .index = index,
+                .value = value
+            };
+        }
+
+        /// Number of registers to be written for initialization
+        static const constexpr size_t kNumInitRegisters{37};
+        /**
+         * Register data to be written to the DUART at reset time.
+         */
+        static const RegInfo gInitRegisters[kNumInitRegisters];
+
+        /**
+         * Timer ticks since the last reset.
+         *
+         * Ticks occur at a rate of 50Hz, and this counter is incremented by one each time. Note
+         * that this relies on the running code not disabling interrupts, or ticks will be lost.
+         */
+        static uint32_t gTicks;
 };
 }
