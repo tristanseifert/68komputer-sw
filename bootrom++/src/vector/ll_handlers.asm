@@ -16,7 +16,6 @@ isr_reserved_\1:
     public isr_trace, isr_line1010, isr_line1111
     public isr_irq_uninitialized, isr_irq_spurious, isr_irq_unhandled_avec1
     public isr_irq_unhandled_avec2, isr_irq_unhandled_avec3, isr_rom_svc_trap
-    public isr_irq_xr68c681
 
 ; a reserved vector was triggered (should never happen)
 isr_reserved:
@@ -85,6 +84,7 @@ isr_irq_unhandled_avec3:
 ;
 ; Based on the function number in d0.w, it will invoke the correct handler function.
 isr_rom_svc_trap:
+    moveq       #-1, d0
     rte
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -106,17 +106,6 @@ isr_rom_svc_trap:
     GenerateReservedVec         2C
     GenerateReservedVec         2D
     GenerateReservedVec         2E
-
-; isr for the DUART
-; TODO: should be rewritten in pure asm to be less fucked
-isr_irq_xr68c681:
-    movem       d0-d7/a0-a6, -(sp)
-    link        fp, #0
-    bsr         _ZN2hw8Xr68C6819HandleIrqEv
-    unlk        fp
-    movem       (sp)+, d0-d7/a0-a6
-
-    rte
 
 ; default user interrupt vectors
     GenerateReservedVec         40

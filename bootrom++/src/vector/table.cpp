@@ -1,6 +1,8 @@
 #include "table.h"
 #include "handlers.h"
 
+#include "svc/SvcTable.h"
+
 /// Address of this symbol is the top of the stack
 extern "C" void *_stack_ptr;
 
@@ -170,7 +172,7 @@ const __attribute__((section(".vectors"))) void *Vectors::gVectorTable[Vectors::
     reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),
     reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),
 
-    /* the last 16 vectors are used for hw interrupts by the boot ROM */
+    /* the last 15 vectors are used for hw interrupts by the boot ROM */
     reinterpret_cast<void *>(&isr_irq_xr68c681),
 
     reinterpret_cast<void *>(&isr_reserved),
@@ -180,7 +182,10 @@ const __attribute__((section(".vectors"))) void *Vectors::gVectorTable[Vectors::
     reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),
     reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),
     reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),
-    reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),
+    reinterpret_cast<void *>(&isr_reserved),
+
+    /* the last vector holds the address of the function table */
+    &SvcTable::gTable,
 };
 
 /**

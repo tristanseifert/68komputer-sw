@@ -1,7 +1,8 @@
 #include "Console.h"
-#include "hw/Xr68c681.h"
 
 #include <printf.h>
+
+void (*Console::gPutChar)(const char){nullptr};
 
 /**
  * Thunk through the bare printf output to the console.
@@ -20,15 +21,6 @@ void Console::Init() {
 }
 
 
-
-/**
- * Writes a character to all registered console output devices.
- *
- * @param ch Single character to write to the console
- */
-void Console::Put(const char ch) {
-    hw::Xr68C681::PutCharA(ch);
-}
 
 /**
  * Writes a string to the console.

@@ -18,9 +18,6 @@ namespace hw {
  * bus.
  */
 class Xr68C681 {
-    protected:
-        static void HandleIrq();
-
     public:
         static void Reset();
 
@@ -123,6 +120,8 @@ class Xr68C681 {
           * It's assumed the DUART is a byte wide peripheral at the given address, and that we
           * need to increment the address by the width of the data bus to get to the next
           * register.
+          *
+          * @remark If this is changed, be sure to also update the ISR.
           */
         static const constexpr uintptr_t kBaseAddr{0x130001};
 

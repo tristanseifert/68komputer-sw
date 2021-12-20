@@ -1,5 +1,5 @@
 #include "hw.h"
-#include "Xr68c681.h"
+#include "xr68c681/Xr68c681.h"
 
 #include "io/Console.h"
 #include "vector/table.h"

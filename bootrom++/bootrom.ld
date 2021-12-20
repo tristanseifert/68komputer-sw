@@ -12,25 +12,33 @@ SECTIONS {
     __text_start = .;
     .text : {
         *(.vectors .vectors*)
+        *(.svctable .svctable*)
+
+        . = ALIGN(4);
         *(CODE*)
         *(.text .text.*)
+
+        . = ALIGN(4);
         *(.rodata .rodata*)
+        . = ALIGN(4);
     } > ROM
     __text_end = .;
 
     /* location of the .data segment to copy from ROM */
     __data_rom_start = .;
-    .data : {
+    .data : AT (ADDR(.text) + SIZEOF (.text)) {
         /* start of .data in RAM */
         __data_ram_start = .;
         *(*.data .data.*)
         /* end of .data in RAM */
         __data_ram_end = .;
-    } > RAM AT >ROM
+    } > RAM
     /* total bytes of .data to copy from ROM */
     PROVIDE(__data_rom_size = __data_ram_end - __data_ram_start);
     /* total dwords of data to copy, minus 1 (for use as a loop counter) */
     PROVIDE(__data_rom_dwords = ((__data_ram_end - __data_ram_start) / 4) - 1);
+
+    . = ALIGN(4);
 
     .bss (NOLOAD) : ALIGN(4) {
         /* start of .bss in RAM */

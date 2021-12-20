@@ -37,7 +37,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     add_compile_options(-Wall -Wextra -Wmissing-declarations -Wformat=2 -Wcast-qual
         -fdiagnostics-color=always -Wwrite-strings -Wimplicit-fallthrough
-        -Wno-undef -Wno-unused-but-set-variable -Wno-unknown-pragmas)
+        -Wno-undef -Wno-unused-but-set-variable -Wno-unknown-pragmas -Wno-multichar)
     add_compile_options(-Werror)
 else()
     message(FATAL_ERROR "We do not know what C/C++ warning flags to use for compiler '${CMAKE_CXX_COMPILER_ID}'!")
@@ -71,12 +71,14 @@ add_executable(bootrom
     src/vector/table.cpp
     src/vector/ll_handlers.asm
     src/io/Console.cpp
+    src/svc/SvcTable.cpp
     src/hw/init.cpp
-    src/hw/Xr68c681.cpp
+    src/hw/xr68c681/Xr68c681.cpp
+    src/hw/xr68c681/isr.asm
 )
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_link_libraries(bootrom PRIVATE printf runtime)
-target_compile_options(bootrom PRIVATE -fno-rtti)
+target_compile_options(bootrom PRIVATE -fno-rtti -fno-exceptions)
 target_link_options(bootrom PRIVATE -static -nostdlib -nostartfiles)
 
 # we have to use a custom linker script
