@@ -3,6 +3,8 @@
 #include <printf.h>
 
 void (*Console::gPutChar)(const char){nullptr};
+bool (*Console::gCharPending)(){nullptr};
+char (*Console::gGetChar)(){nullptr};
 
 /**
  * Thunk through the bare printf output to the console.

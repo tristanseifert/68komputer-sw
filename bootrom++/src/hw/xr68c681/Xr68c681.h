@@ -18,13 +18,29 @@ namespace hw {
  * bus.
  */
 class Xr68C681 {
+    private:
+        Xr68C681() = delete;
+
     public:
         static void Reset();
 
         static void PutCharA(char ch);
-        static void PutCharB(char ch);
+        static bool TxEmptyA();
+        static bool RxWaitingA();
+        static bool RxOverrunA();
+        static bool RxFramingErrorA();
+        static bool RxBreakA();
+        static void ClearErrorsA();
+        static char GetCharA();
 
-        Xr68C681() = delete;
+        static void PutCharB(char ch);
+        static bool TxEmptyB();
+        static bool RxWaitingB();
+        static bool RxOverrunB();
+        static bool RxFramingErrorB();
+        static bool RxBreakB();
+        static void ClearErrorsB();
+        static char GetCharB();
 
         /**
          * Names of registers in the DUART
@@ -114,15 +130,15 @@ class Xr68C681 {
             RxReady                     = (1 << 0),
         };
 
-         /**
-          * Base physical address of the DUART.
-          *
-          * It's assumed the DUART is a byte wide peripheral at the given address, and that we
-          * need to increment the address by the width of the data bus to get to the next
-          * register.
-          *
-          * @remark If this is changed, be sure to also update the ISR.
-          */
+        /**
+         * Base physical address of the DUART.
+         *
+         * It's assumed the DUART is a byte wide peripheral at the given address, and that we
+         * need to increment the address by the width of the data bus to get to the next
+         * register.
+         *
+         * @remark If this is changed, be sure to also update the ISR.
+         */
         static const constexpr uintptr_t kBaseAddr{0x130001};
 
         /**
@@ -130,6 +146,59 @@ class Xr68C681 {
          * the timer tick count.
          */
         static const constexpr uint8_t kIrqVector{0xF0};
+
+    private:
+        /// Command values to write to the command register
+        enum class Command: uint8_t {
+            /// No operation
+            Null                        = (0b0000 << 4),
+            /// Reset the MRn pointer to point to MR1
+            ResetMRn                    = (0b0001 << 4),
+            /// Resets the receiver and flushes its FIFO
+            ResetReceiver               = (0b0010 << 4),
+            /// Resets the transmitter
+            ResetTransmitter            = (0b0011 << 4),
+            /// Resets the error status bits
+            ResetErrorStatus            = (0b0100 << 4),
+            /// Clear the channel's break change interrupt status
+            ResetBreakChangeIrq         = (0b0101 << 4),
+            /// Start transmitting a break; wait for TXEMP first.
+            StartBreak                  = (0b0110 << 4),
+            /// Stop transmitting a break
+            StopBreak                   = (0b0111 << 4),
+            /// Sets the receiver baud rate set extend bit
+            RxSetBaudRateExtend         = (0b1000 << 4),
+            /// Clear the receiver baud rate set extend bit
+            RxClearBaudRateExtend       = (0b1001 << 4),
+            /// Sets the receiver baud rate set extend bit
+            TxSetBaudRateExtend         = (0b1010 << 4),
+            /// Clear the receiver baud rate set extend bit
+            TxClearBaudRateExtend       = (0b1011 << 4),
+            /// Enters standby mode
+            EnterStandby                = (0b1100 << 4),
+            /// Enter active mode
+            SetActiveMode               = (0b1101 << 4),
+        };
+
+        /**
+         * Builds a command register value with the given operation, but no change to the state of
+         * the transmitter or receiver.
+         *
+         * @param opcode Operation to perform on the channel
+         */
+        static inline constexpr uint8_t MakeCommand(const Command opcode) {
+            return static_cast<uint8_t>(opcode);
+        }
+        /**
+         * Builds a command register value with a no-op operation, which enables or disables the
+         * given channels.
+         *
+         * @param tx Whether the transmitter is enabled
+         * @param rx Whether the receiver is enabled
+         */
+        static inline constexpr uint8_t MakeCommand(const bool tx, const bool rx) {
+            return (tx ? 0b0100 : 0b1000) | (rx ? 0b0001 : 0b0010);
+        }
 
     private:
         /// A single register write transaction
@@ -147,7 +216,7 @@ class Xr68C681 {
         }
 
         /// Number of registers to be written for initialization
-        static const constexpr size_t kNumInitRegisters{37};
+        static const constexpr size_t kNumInitRegisters{34};
         /**
          * Register data to be written to the DUART at reset time.
          */
