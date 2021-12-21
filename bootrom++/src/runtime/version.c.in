@@ -1,0 +1,8 @@
+/*
+ * Template file for the version labeling for the ROM. It's processed with the git tag/commit
+ * during the start of build.
+ */
+#include "runtime/version.h"
+
+const char *gVersionCommit = "@VERSION_COMMIT@";
+const char *gVersionShort = "@VERSION_TAG@";
