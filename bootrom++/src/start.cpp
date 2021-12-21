@@ -1,4 +1,5 @@
 #include "io/Console.h"
+#include "shell/Shell.h"
 
 #include <stdint.h>
 
@@ -13,10 +14,13 @@ extern "C" void bootrom_start();
  * out whether we should look for an application to boot, or drop into the boot ROM monitor.
  */
 void bootrom_start() {
-    Console::Put("Yo what's up, today were going to smoke weed\r\n");
+    // initialize some stuff
+    Shell::Init();
 
-    Console::Print("Kush number = %d\r\n", 420);
+    // TODO: check NVRAM, hardware, DIP switches
 
-    // XXX: infinite loop
-    for(;;) {}
+    // enter the shell thingie
+    for(;;) {
+        Shell::RunPrompt(true);
+    }
 }

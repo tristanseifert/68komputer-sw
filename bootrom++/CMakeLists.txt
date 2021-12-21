@@ -81,6 +81,7 @@ add_library(runtime STATIC
     src/runtime/string/strncmp.c
     src/runtime/string/strncpy.c
     src/runtime/string/strnlen.c
+    src/runtime/string/strtok.c
     src/runtime/stdlib/strtol.c
     src/runtime/stdlib/strtoul.c
     src/runtime/ctype/isalnum.c
@@ -115,6 +116,9 @@ add_executable(bootrom
     src/hw/init.cpp
     src/hw/xr68c681/Xr68c681.cpp
     src/hw/xr68c681/isr.asm
+    src/shell/Shell.cpp
+    src/shell/CommandList.cpp
+    src/shell/HexDump.cpp
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
