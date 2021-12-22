@@ -22,6 +22,10 @@ class HexDump {
             return {
                 .name = "hexdump",
                 .shortHelp = "Print contents of memory",
+                .longHelp = "Output the contents of a region of memory to the console.\r\n\n"
+                    " - \x1b[1mhexdump\x1b[0m [loc]: Output 128 bytes starting at `loc`.\r\n"
+                    " - \x1b[1mhexdump\x1b[0m [loc] [n]: Output `n` bytes, starting at `loc`.\r\n\n"
+                    "Both `loc` and `n` are specified in hexadecimal, with or without leading 0x.\r\n",
                 .handler = Handle,
             };
         }

@@ -4,7 +4,7 @@
 #include "svc/SvcTable.h"
 
 /// Address of this symbol is the top of the stack
-extern "C" void *_stack_ptr;
+extern "C" char _stack_ptr;
 
 /*
  * Vector table; this is stored directly at the start of the ROM in the vector table section.

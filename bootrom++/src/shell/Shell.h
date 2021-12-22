@@ -32,6 +32,10 @@ class Shell {
              */
             const char *shortHelp{nullptr};
             /**
+             * Long help description string, printed when `help [command]` is invoked.
+             */
+            const char *longHelp{nullptr};
+            /**
              * Function to be invoked when this command is executed.
              *
              * @param name Command string entered by the user
@@ -51,6 +55,10 @@ class Shell {
         static void PrintPrompt();
         static bool ReadLine();
         static bool ParseLine();
+
+        static bool FindCommandDescriptor(const char *name, const Command **outCmd);
+
+        static int HelpCommandHandler(const char *, char *param);
 
     private:
         /**

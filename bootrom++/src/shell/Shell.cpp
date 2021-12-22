@@ -114,19 +114,82 @@ bool Shell::ParseLine() {
 
 beach:;
     // try to find the appropriate command and invoke it
-    const auto commandLen = strnlen(command, kMaxLineLength);
-
-    // TODO: we could optimize this if the command list is sorted
-      for(size_t i = 0; i < kNumCommands; i++) {
-          const auto &h = gCommands[i];
-
-        // does the name match exactly?
-        if(!strncmp(command, h.name, commandLen)) {
-            h.handler(command, args);
-            return true;
-        }
+    const Command *cmdInfo{nullptr};
+    if(FindCommandDescriptor(command, &cmdInfo)) {
+        cmdInfo->handler(command, args);
+        return true;
     }
 
     // if we get here, no handler is suitable
     return false;
+}
+
+/**
+ * Finds a command descriptor that can handle the command with the given name.
+ *
+ * @param name Command name to search for
+ * @param outCmd If found, this variable receives the command descriptor's address
+ *
+ * @return Whether a command was found
+ */
+bool Shell::FindCommandDescriptor(const char *name, const Command **outCmd) {
+    const auto commandLen = strnlen(name, kMaxLineLength);
+
+    // TODO: we could optimize this if the command list is sorted
+    for(size_t i = 0; i < kNumCommands; i++) {
+          const auto &h = gCommands[i];
+
+        if(!strncmp(name, h.name, commandLen)) {
+            *outCmd = &h;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+
+/**
+ * Handler for the help command.
+ *
+ * We'll print either a list of all commands, or if a parameter is specified, find that command's
+ * detailed info and print it.
+ *
+ * @param params Optional argument string to the help command
+ *
+ * @return 0 on success, or -1 if the specified detail command name couldn't be found
+ */
+int Shell::HelpCommandHandler(const char *, char *params) {
+    // no parameter: print all commands
+    if(!params) {
+        Console::Put("***** Available Commands *****\r\n");
+        for(size_t i = 0; i < kNumCommands; i++) {
+            const auto &h = gCommands[i];
+            Console::Print("%12s: %s\r\n", h.name, h.shortHelp ? h.shortHelp : "");
+        }
+    }
+    // grab the first arg as a command to get the long help text for
+    else {
+        const auto commandName = strtok(params, " ");
+        if(!commandName) {
+            Console::Put("usage: help [command name]\r\n");
+            return -1;
+        }
+
+        const Command *cmdInfo{nullptr};
+        if(!FindCommandDescriptor(commandName, &cmdInfo)) {
+            Console::Print("No command `%s` found\r\n", commandName);
+            return -1;
+        }
+
+        // print its long help text if available
+        if(cmdInfo->longHelp) {
+            Console::Put(cmdInfo->longHelp);
+        } else {
+            Console::Print("No detailed help is available for `%s`.\r\n", commandName);
+        }
+    }
+
+    return 0;
 }

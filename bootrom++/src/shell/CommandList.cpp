@@ -14,19 +14,16 @@ using namespace shellcmd;
  */
 const Shell::Command Shell::gCommands[kNumCommands] = {
     /**
-     * Help: Prints all commands known to the shell out on the terminal.
+     * Help: Prints all commands known to the shell out on the terminal. If an argument is
+     * specified, we assume that's the name of a command to print detailed help for.
      */
     {
         .name = "help",
-        .shortHelp = "Show all known commands",
-        .handler = [](auto, auto) -> int {
-            Console::Put("***** Available Commands *****\r\n");
-            for(size_t i = 0; i < kNumCommands; i++) {
-                const auto &h = gCommands[i];
-                Console::Print("%12s: %s\r\n", h.name, h.shortHelp ? h.shortHelp : "");
-            }
-            return 0;
-        }
+        .shortHelp = "How the hell does this thing work?",
+        .longHelp = "Print help provided for built in commands:\r\n\n"
+            " - \x1b[1mhelp\x1b[0m: Show a short overview of all available commands\r\n"
+            " - \x1b[1mhelp\x1b[0m [command name]: Show detailed information specific to this command\r\n",
+        .handler = Shell::HelpCommandHandler,
     },
     //  `hexdump`: read memory
     HexDump::GetCommandDescriptor(),

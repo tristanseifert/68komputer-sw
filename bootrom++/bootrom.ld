@@ -3,7 +3,8 @@ OUTPUT_ARCH(m68k)
 
 MEMORY { 
     ROM (rx)  : ORIGIN = 0, LENGTH = 1M
-    RAM (rwx) : ORIGIN = 0xFFFFC000, LENGTH = 16k
+    /* take all of the fast RAM for .data and .bss */
+    RAM (rwx) : ORIGIN = 0xFFFF8000, LENGTH = 32k
 }
 
 SECTIONS {
@@ -53,6 +54,9 @@ SECTIONS {
     /* number of dwords, minus 1, of bss (for use as a loop counter) */
     PROVIDE(__bss_dwords = ((__bss_end - __bss_start) / 4));
 
-    /* put the stack at the very end of RAM */
-    PROVIDE(_stack_ptr = ORIGIN(RAM) + LENGTH(RAM));
+    /* 0x400 = space reserved for stack */
+    . = ORIGIN(RAM) + LENGTH(RAM) - 0x400;
+    _stack_top = .;
+    . += 0x400;
+    _stack_ptr = .;
 }

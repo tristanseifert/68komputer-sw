@@ -1,11 +1,18 @@
 #include "io/Console.h"
 #include "shell/Shell.h"
+#include "runtime/version.h"
+
 
 #include <stdint.h>
 
 #include <printf.h>
 
-extern "C" void bootrom_start();
+extern "C" {
+void bootrom_start();
+
+// 0 = cold boot, 1 = warm reset
+extern uint8_t resetreason;
+}
 
 /**
  * Entry point for the boot ROM
@@ -18,6 +25,8 @@ void bootrom_start() {
     Shell::Init();
 
     // TODO: check NVRAM, hardware, DIP switches
+    Console::Print("68komputer monitor (version %s)\r\n", gVersionShort);
+    Console::Print("Reset reason: %s\r\n", (resetreason == 0) ? "cold boot" : "warm reset");
 
     // enter the shell thingie
     for(;;) {
