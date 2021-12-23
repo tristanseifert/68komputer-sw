@@ -112,6 +112,7 @@ add_executable(bootrom
     ${CMAKE_CURRENT_BINARY_DIR}/version.c
     src/vector/table.cpp
     src/vector/ll_handlers.asm
+    src/io/UnitTable.cpp
     src/io/Console.cpp
     src/svc/SvcTable.cpp
     src/hw/init.cpp
@@ -120,6 +121,7 @@ add_executable(bootrom
     src/shell/Shell.cpp
     src/shell/CommandList.cpp
     src/shell/HexDump.cpp
+    src/shell/Inventory.cpp
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)

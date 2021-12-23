@@ -4,5 +4,5 @@
  */
 #include "runtime/version.h"
 
-const char *gVersionCommit = "@VERSION_COMMIT@";
-const char *gVersionShort = "@VERSION_TAG@";
+const char * const gVersionCommit = "@VERSION_COMMIT@";
+const char * const gVersionShort = "@VERSION_TAG@";

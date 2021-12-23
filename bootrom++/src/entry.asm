@@ -44,21 +44,30 @@ romentry:
     ; copy .data to RAM
     lea         __data_rom_start, a0
     lea         __data_ram_start, a1
-    move.w      #__data_rom_dwords, d0
+    move.l      #__data_rom_dwords, d0
+    ; -1 = there's no data to copy
+    cmp.w       #-1, d0
+    beq.s       .nodata
 
 .copydata:
     move.l      (a0)+, (a1)+
     dbf         d0, .copydata
 
+.nodata:
     ; clear .bss
     lea         __bss_start, a0
-    move.w      #__bss_dwords, d0
+    move.l      #__bss_dwords, d0
+    ; -1 = there's no bss to clear
+    cmp.w       #-1, d0
+    beq.s       .nobss
+
     moveq       #0, d1
 
 .clearbss:
     move.l      d1, (a0)+
     dbf         d0, .clearbss
 
+.nobss:
     ; set up drivers/hardware
     bsr         hw_init
 

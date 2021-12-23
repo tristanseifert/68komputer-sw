@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+struct driver_info_t;
+
 namespace hw {
 /**
  * Hardware driver for the XR68C681 DUART. It contains two serial ports, a 6 bit input port and a
@@ -70,6 +72,8 @@ class Xr68C681 {
         constexpr auto getPortB() {
             return &this->portB;
         }
+
+        static const driver_info_t gDriverInfo;
 
     private:
         void resetRegisters();

@@ -1,6 +1,7 @@
 #include "Shell.h"
 
 #include "HexDump.h"
+#include "Inventory.h"
 
 #include "runtime/version.h"
 #include "io/Console.h"
@@ -27,6 +28,8 @@ const Shell::Command Shell::gCommands[kNumCommands] = {
     },
     //  `hexdump`: read memory
     HexDump::GetCommandDescriptor(),
+    // `units`: Dump unit table
+    Inventory::GetUnitsCommandDescriptor(),
     /**
      * Version: Prints information about what version of the boot ROM is currently running,
      * including compile date.

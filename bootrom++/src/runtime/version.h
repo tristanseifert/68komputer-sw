@@ -5,9 +5,9 @@ extern "C" {
 #endif
 
 /// Abbreviated git commit being built from
-extern const char *gVersionCommit;
+extern const char * const gVersionCommit;
 /// Short version (git tag)
-extern const char *gVersionShort;
+extern const char * const gVersionShort;
 
 #ifdef __cplusplus
 }

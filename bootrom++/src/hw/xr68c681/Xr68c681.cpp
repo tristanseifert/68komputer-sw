@@ -1,5 +1,9 @@
 #include "Xr68c681.h"
 #include "io/Console.h"
+#include "io/UnitTable.h"
+#include "runtime/version.h"
+
+#include <bootrom/Driver.h>
 
 using namespace hw;
 
@@ -65,6 +69,14 @@ const Xr68C681::RegInfo Xr68C681::gInitRegisters[kNumInitRegisters] = {
 //    MakeRegister(Reg::IMR, 0b00001000),
 };
 
+const driver_info_t Xr68C681::gDriverInfo {
+    .magic=  'DRVR',
+    .name = "XR68C681",
+    .author = "Tristan Seifert",
+    .description = "Built in XR68C681 driver",
+    .version = "0.1",
+};
+
 
 
 /**
@@ -80,6 +92,10 @@ Xr68C681::Xr68C681(volatile void *base, const uint8_t vector) :
         this->irqSupported = true;
         *REG(IVR) = vector;
     }
+
+    // register devices
+    io::UnitTable::Register(io::UnitTable::Type::CharSerial, gDriverInfo, getPortA());
+    io::UnitTable::Register(io::UnitTable::Type::CharSerial, gDriverInfo, getPortB());
 }
 
 /**
