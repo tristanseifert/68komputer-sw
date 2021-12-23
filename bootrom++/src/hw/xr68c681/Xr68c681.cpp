@@ -3,14 +3,14 @@
 
 using namespace hw;
 
-#define REG(x) (reinterpret_cast<volatile uint8_t *>(Xr68C681::kBaseAddr) + static_cast<uint8_t>(Xr68C681::Reg::x))
+#define REG(x) (reinterpret_cast<volatile uint8_t *>(this->base) + static_cast<uint8_t>(Xr68C681::Reg::x))
 
 uint32_t Xr68C681::gTicks{0};
 
 /**
  * Define the values the DUART registers are reset to when the ROM initializes.
  */
-const Xr68C681::RegInfo Xr68C681::gInitRegisters[Xr68C681::kNumInitRegisters] = {
+const Xr68C681::RegInfo Xr68C681::gInitRegisters[kNumInitRegisters] = {
     // enter active mode
     MakeRegister(Reg::CRA, MakeCommand(Command::SetActiveMode)),
     // mask all interrupts
@@ -61,10 +61,26 @@ const Xr68C681::RegInfo Xr68C681::gInitRegisters[Xr68C681::kNumInitRegisters] = 
     MakeRegister(Reg::SOPBC, 0b00000100),
 
     // configure interrupts
-    MakeRegister(Reg::IVR, kIrqVector),
-    MakeRegister(Reg::IMR, 0b00001000),
+//    MakeRegister(Reg::IVR, kIrqVector),
+//    MakeRegister(Reg::IMR, 0b00001000),
 };
 
+
+
+/**
+ * Initialize the DUART driver for a 68681 compatible UART at the given address. If the vector
+ * specified is nonzero, it's enabled for interrupts as well.
+ */
+Xr68C681::Xr68C681(volatile void *base, const uint8_t vector) :
+    base(reinterpret_cast<volatile uint8_t *>(base)), portA(this->base), portB(this->base + (8*2)) {
+    this->resetRegisters();
+
+    // set up IRQ vector
+    if(vector) {
+        this->irqSupported = true;
+        *REG(IVR) = vector;
+    }
+}
 
 /**
  * Resets the DUART and configures registers with default values.
@@ -73,84 +89,36 @@ const Xr68C681::RegInfo Xr68C681::gInitRegisters[Xr68C681::kNumInitRegisters] = 
  * hardware flow control. All LEDs are extinguished and the timer is set in counter mode, to
  * generate an interrupt at 100Hz.
  */
-void Xr68C681::Reset() {
+void Xr68C681::resetRegisters() {
     for(size_t i = 0; i < kNumInitRegisters; i++) {
         const auto &r = gInitRegisters[i];
-        *(reinterpret_cast<volatile uint8_t *>(kBaseAddr) + static_cast<uint8_t>(r.index)) = r.value;
+        *(reinterpret_cast<volatile uint8_t *>(this->base) + static_cast<uint8_t>(r.index)) = r.value;
     }
-
-    // register port A as console device
-    Console::SetOutHandler(Xr68C681::PutCharA);
-    Console::SetInPendingHandler(Xr68C681::RxWaitingA);
-    Console::SetInHandler(Xr68C681::GetCharA);
 
     // start counter/timer
     (void) *REG(SCC);
 }
 
+
+
 /**
- * Write the given character to port A on the DUART.
+ * Write the given character to a port on the DUART.
  *
  * @param ch Character to write
- *
- * @remark This call will block until a character is available to write in the FIFO.
  */
-void Xr68C681::PutCharA(char ch) {
-    // wait for TXRDY
+int Xr68C681::Port::write(char ch) {
+    // ensure TXRDY
     while(!(*REG(SRA) & ChannelStatus::TxReady)) {}
+
     *REG(THRA) = ch;
+    return 0;
 }
 
 /**
- * Checks whether the port A transmit FIFO is empty.
- *
- * @return Whether there's a character waiting in the transmit FIFO.
+ * Checks whether the device is ready to accept another character to write.
  */
-bool Xr68C681::TxEmptyA() {
-    return !!(*REG(SRA) & ChannelStatus::TxFifoEmpty);
-}
-
-/**
- * Checks whether a character is waiting to be read from the port A receive FIFO.
- *
- * @return Whether there's a character waiting in the FIFO.
- */
-bool Xr68C681::RxWaitingA() {
-    return !!(*REG(SRA) & ChannelStatus::RxReady);
-}
-
-/**
- * Checks whether the port A receive FIFO has been overrun
- *
- * @return FIFO overrun and a character was lost
- */
-bool Xr68C681::RxOverrunA() {
-    return !!(*REG(SRA) & ChannelStatus::Overrun);
-}
-
-/**
- * Checks whether the port A has received a framing error
- *
- * @return When set, a framing error occurred
- */
-bool Xr68C681::RxFramingErrorA() {
-    return !!(*REG(SRA) & ChannelStatus::FramingError);
-}
-
-/**
- * Checks whether the port A was received a break
- *
- * @return When set, a break was received
- */
-bool Xr68C681::RxBreakA() {
-    return !!(*REG(SRA) & ChannelStatus::Break);
-}
-
-/**
- * Clears any pending errors on port A.
- */
-void Xr68C681::ClearErrorsA() {
-    *REG(CRA) = 0b01000000;
+bool Xr68C681::Port::writeAvailable() {
+    return !!(*REG(SRA) & ChannelStatus::TxReady);
 }
 
 /**
@@ -160,83 +128,50 @@ void Xr68C681::ClearErrorsA() {
  *
  * @remark Ensure a character is pending in the FIFO before trying to read one.
  */
-char Xr68C681::GetCharA() {
+int Xr68C681::Port::read() {
+    // TODO: ensure a character is pending?
     return *REG(RHRA);
 }
 
-
 /**
- * Write the given character to port B on the DUART.
- *
- * @param ch Character to write
- *
- * @remark This call will block until a character is available to write in the FIFO.
+ * Checks whether a character is waiting to be read from the port's receive FIFO.
  */
-void Xr68C681::PutCharB(char ch) {
-    // wait for TXRDY
-    while(!(*REG(SRB) & ChannelStatus::TxReady)) {}
-    *REG(THRB) = ch;
+bool Xr68C681::Port::readAvailable() {
+    return !!(*REG(SRA) & ChannelStatus::RxReady);
 }
 
 /**
- * Checks whether the port B transmit FIFO is empty.
- *
- * @return Whether there's a character waiting in the transmit FIFO.
+ * Checks whether the transmit FIFO underran.
  */
-bool Xr68C681::TxEmptyB() {
-    return !!(*REG(SRB) & ChannelStatus::TxFifoEmpty);
+bool Xr68C681::Port::txUnderrun() {
+    return !!(*REG(SRA) & ChannelStatus::TxFifoEmpty);
 }
 
 /**
- * Checks whether a character is waiting to be read from the port B receive FIFO.
- *
- * @return Whether there's a character waiting in the FIFO.
+ * Checks whether the port's receive FIFO has been overrun
  */
-bool Xr68C681::RxWaitingB() {
-    return !!(*REG(SRB) & ChannelStatus::RxReady);
+bool Xr68C681::Port::rxOverrun() {
+    return !!(*REG(SRA) & ChannelStatus::Overrun);
 }
 
 /**
- * Checks whether the port B receive FIFO has been overrun
- *
- * @return FIFO overrun and a character was lost
+ * Checks whether the port has encountered a framing error
  */
-bool Xr68C681::RxOverrunB() {
-    return !!(*REG(SRB) & ChannelStatus::Overrun);
+bool Xr68C681::Port::rxFramingError() {
+    return !!(*REG(SRA) & ChannelStatus::FramingError);
 }
 
 /**
- * Checks whether the port B has received a framing error
- *
- * @return When set, a framing error occurred
+ * Checks whether the port received a break condition on the line
  */
-bool Xr68C681::RxFramingErrorB() {
-    return !!(*REG(SRB) & ChannelStatus::FramingError);
+bool Xr68C681::Port::rxBreak() {
+    return !!(*REG(SRA) & ChannelStatus::Break);
 }
 
 /**
- * Checks whether the port B was received a break
- *
- * @return When set, a break was received
+ * Clears any pending errors on the port.
  */
-bool Xr68C681::RxBreakB() {
-    return !!(*REG(SRB) & ChannelStatus::Break);
+void Xr68C681::Port::clearErrors() {
+    *REG(CRA) = MakeCommand(Command::ResetErrorStatus);
 }
 
-/**
- * Clears any pending errors on port B.
- */
-void Xr68C681::ClearErrorsB() {
-    *REG(CRB) = 0b01000000;
-}
-
-/**
- * Reads a character from the port B receive FIFO.
- *
- * @return Oldest character in the receive FIFO.
- *
- * @remark Ensure a character is pending in the FIFO before trying to read one.
- */
-char Xr68C681::GetCharB() {
-    return *REG(RHRB);
-}

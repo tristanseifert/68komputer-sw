@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CharacterDevice.h"
+
 #include <stdarg.h>
 #include <stddef.h>
 
@@ -13,7 +15,7 @@ class Console {
          * @param ch Single character to write to the console
          */
         static inline void Put(const char ch) {
-            gPutChar(ch);
+            gOutputDevice->write(ch);
         }
 
         static void Put(const char *);
@@ -25,7 +27,7 @@ class Console {
          * @return Whether one or more characters are pending to be read
          */
         static bool GetCharPending() {
-            return gCharPending();
+            return gOutputDevice->readAvailable();
         }
 
         /**
@@ -37,61 +39,25 @@ class Console {
          *         undefined.
          */
         static char GetChar() {
-            return gGetChar();
+            return gOutputDevice->read();
         }
 
         /**
-         * Sets the character output handler for the console.
+         * Sets a character device to be used for all console IO.
          *
-         * @param newHandler New handler function called to print a character
+         * @param newDevice New character device
          *
-         * @return Current handler function
+         * @return Current character device
          */
-        static auto SetOutHandler(void (*newHandler)(const char)) {
-            auto old = gPutChar;
-            gPutChar = newHandler;
-            return old;
-        }
-
-        /**
-         * Sets the character pending handler for the console.
-         *
-         * @param newHandler New handler function called to check if characters are pending
-         *
-         * @return Current handler function
-         */
-        static auto SetInPendingHandler(bool (*newHandler)()) {
-            auto old = gCharPending;
-            gCharPending = newHandler;
-            return old;
-        }
-
-        /**
-         * Sets the character input handler for the console.
-         *
-         * @param newHandler New handler function called to read a character
-         *
-         * @return Current handler function
-         */
-        static auto SetInHandler(char (*newHandler)()) {
-            auto old = gGetChar;
-            gGetChar = newHandler;
+        static auto SetDevice(io::CharacterDevice *newDevice) {
+            auto old = gOutputDevice;
+            gOutputDevice = newDevice;
             return old;
         }
 
     private:
         /**
-         * Function to invoke for printing a character to the console.
+         * Character device to be used for console output
          */
-        static void (*gPutChar)(const char);
-
-        /**
-         * Function to invoke to check if a character can be read.
-         */
-        static bool (*gCharPending)();
-
-        /**
-         * Function to pop a character off the receive queue.
-         */
-        static char (*gGetChar)();
+        static io::CharacterDevice *gOutputDevice;
 };

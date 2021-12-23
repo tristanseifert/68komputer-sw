@@ -31,6 +31,7 @@ SECTIONS {
         /* start of .data in RAM */
         __data_ram_start = .;
         *(*.data .data.*)
+        . = ALIGN(4);
         /* end of .data in RAM */
         __data_ram_end = .;
     } > RAM
@@ -46,6 +47,7 @@ SECTIONS {
         __bss_start = .;
         *(.bss .bss.*)
         *(COMMON)
+        . = ALIGN(4);
         /* end of .bss in RAM */
         __bss_end = .;
     } > RAM

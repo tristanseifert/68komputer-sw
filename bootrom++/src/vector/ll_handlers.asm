@@ -26,6 +26,27 @@ isr_reserved_common:
 
 ; CPU encountered a bus error during the most recent access
 isr_bus_error:
+    ; save registers and bus error frame
+    movem.l     d0-d7/a0-a6, (exception_regs).w
+
+    lea         (berrframe).w, a0
+    move.l      (sp), (a0)+
+    move.l      4(sp), (a0)+
+    move.l      8(sp), (a0)+
+    move.w      12(sp), (a0)
+
+    ; is /BERR being caught?
+    tst.b       (catchberr).w
+    beq.s       .catch
+
+    ; it's not, so enter the exception handler
+.fatal:
+    ; TODO: implement
+    rte
+
+    ; expecting this error and it should be caught
+.catch:
+    st.b        (hasberr).w
     rte
 
 ; A word or longword access to an odd address was attempted.
@@ -140,4 +161,17 @@ isr_rom_svc_trap:
     GenerateReservedVec         5D
     GenerateReservedVec         5E
     GenerateReservedVec         5F
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.section bss,bss
+    ; register save area for exceptions, in typical movem order. the saved registers are d0-d7 and
+    ; a0-a6, though space is reserved for a7.
+    comm exception_regs, (4*16)
+
+    ; when nonzero, bus errors are being caught
+    comm catchberr, 1
+    ; this is set to a nonzero value if a bus error occurred
+    comm hasberr, 1
+    ; copy of the most recent bus error stack frame
+    comm berrframe, 14
 

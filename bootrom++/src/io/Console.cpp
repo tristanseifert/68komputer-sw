@@ -2,9 +2,9 @@
 
 #include <printf.h>
 
-void (*Console::gPutChar)(const char){nullptr};
-bool (*Console::gCharPending)(){nullptr};
-char (*Console::gGetChar)(){nullptr};
+using namespace io;
+
+CharacterDevice *Console::gOutputDevice{nullptr};
 
 /**
  * Thunk through the bare printf output to the console.

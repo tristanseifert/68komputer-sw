@@ -11,7 +11,7 @@ extern "C" {
 void bootrom_start();
 
 // 0 = cold boot, 1 = warm reset
-extern uint8_t resetreason;
+extern volatile uint8_t resetreason;
 }
 
 /**

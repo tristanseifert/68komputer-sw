@@ -100,6 +100,7 @@ add_library(runtime STATIC
     src/runtime/ctype/toascii.c
     src/runtime/ctype/toupper.c
     src/runtime/ctype/tolower.c
+    src/runtime/cppsupport.cpp
 )
 target_include_directories(runtime PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_compile_options(runtime PRIVATE -Wno-missing-declarations -Wno-cast-qual)

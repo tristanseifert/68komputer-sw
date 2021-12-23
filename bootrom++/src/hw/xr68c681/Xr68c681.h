@@ -1,5 +1,7 @@
 #pragma once
 
+#include "io/CharacterDevice.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -18,30 +20,61 @@ namespace hw {
  * bus.
  */
 class Xr68C681 {
-    private:
-        Xr68C681() = delete;
+    public:
+        /**
+         * Helper class that represents one of the UART ports on the device. Each port may be
+         * individually interacted with.
+         *
+         * @remark All routines for the port refer to the channel A registers; for hannel B, we
+         *         just slide the base address by 8 registers, since channel B's registers are a
+         *         direct mirror of channel A.
+         */
+        class Port final: public io::CharacterDevice {
+            friend class Xr68C681;
+
+            public:
+                bool writeAvailable() override;
+                int write(char ch) override;
+                bool readAvailable() override;
+                int read() override;
+
+                bool txUnderrun();
+                bool rxOverrun();
+                bool rxFramingError();
+                bool rxBreak();
+                void clearErrors();
+
+            private:
+                Port() = delete;
+                Port(volatile uint8_t *base) : base(base) {};
+
+            private:
+                /// Memory address of this channel's register bank
+                volatile uint8_t *base;
+        };
 
     public:
-        static void Reset();
+        Xr68C681(volatile void *base, const uint8_t vector);
+        ~Xr68C681();
 
-        static void PutCharA(char ch);
-        static bool TxEmptyA();
-        static bool RxWaitingA();
-        static bool RxOverrunA();
-        static bool RxFramingErrorA();
-        static bool RxBreakA();
-        static void ClearErrorsA();
-        static char GetCharA();
+        /**
+         * Gets pointer to the port A character device.
+         */
+        constexpr auto getPortA() {
+            return &this->portA;
+        }
 
-        static void PutCharB(char ch);
-        static bool TxEmptyB();
-        static bool RxWaitingB();
-        static bool RxOverrunB();
-        static bool RxFramingErrorB();
-        static bool RxBreakB();
-        static void ClearErrorsB();
-        static char GetCharB();
+        /**
+         * Gets pointer to the port B character device.
+         */
+        constexpr auto getPortB() {
+            return &this->portB;
+        }
 
+    private:
+        void resetRegisters();
+
+    private:
         /**
          * Names of registers in the DUART
          *
@@ -63,6 +96,7 @@ class Xr68C681 {
             RHRA                        = (0x3 * 2),
             ///  W - Channel A transmit holding register/FIFO
             THRA                        = (0x3 * 2),
+
             ///  R - Input port change register
             IPCR                        = (0x4 * 2),
             ///  W - Auxiliary control register
@@ -130,24 +164,6 @@ class Xr68C681 {
             RxReady                     = (1 << 0),
         };
 
-        /**
-         * Base physical address of the DUART.
-         *
-         * It's assumed the DUART is a byte wide peripheral at the given address, and that we
-         * need to increment the address by the width of the data bus to get to the next
-         * register.
-         *
-         * @remark If this is changed, be sure to also update the ISR.
-         */
-        static const constexpr uintptr_t kBaseAddr{0x130001};
-
-        /**
-         * Interrupt vector reserved for use by the DUART. The ROM only makes use of this to update
-         * the timer tick count.
-         */
-        static const constexpr uint8_t kIrqVector{0xF0};
-
-    private:
         /// Command values to write to the command register
         enum class Command: uint8_t {
             /// No operation
@@ -180,6 +196,32 @@ class Xr68C681 {
             SetActiveMode               = (0b1101 << 4),
         };
 
+    private:
+        /**
+         * Base address of the DUART's registers.
+         *
+         * It's assumed that the DUART is only on 8 bits of a 16 bit bus, so to advance to the next
+         * register, we have to add 2 to this pointer.
+         */
+        volatile uint8_t *base;
+
+        /// Whether interrupts are enabled
+        bool irqSupported{false};
+
+        /// Character device for port A
+        Port portA;
+        /// Character device for port B
+        Port portB;
+
+    private:
+        /**
+         * Timer ticks since the last reset.
+         *
+         * Ticks occur at a rate of 50Hz, and this counter is incremented by one each time. Note
+         * that this relies on the running code not disabling interrupts, or ticks will be lost.
+         */
+        static uint32_t gTicks;
+
         /**
          * Builds a command register value with the given operation, but no change to the state of
          * the transmitter or receiver.
@@ -200,7 +242,6 @@ class Xr68C681 {
             return (tx ? 0b0100 : 0b1000) | (rx ? 0b0001 : 0b0010);
         }
 
-    private:
         /// A single register write transaction
         struct RegInfo {
             Reg index;
@@ -216,18 +257,10 @@ class Xr68C681 {
         }
 
         /// Number of registers to be written for initialization
-        static const constexpr size_t kNumInitRegisters{34};
+        static const constexpr size_t kNumInitRegisters{32};
         /**
          * Register data to be written to the DUART at reset time.
          */
         static const RegInfo gInitRegisters[kNumInitRegisters];
-
-        /**
-         * Timer ticks since the last reset.
-         *
-         * Ticks occur at a rate of 50Hz, and this counter is incremented by one each time. Note
-         * that this relies on the running code not disabling interrupts, or ticks will be lost.
-         */
-        static uint32_t gTicks;
 };
 }
