@@ -3,6 +3,7 @@
 #include "Download.h"
 #include "HexDump.h"
 #include "Inventory.h"
+#include "Memory.h"
 
 #include "runtime/version.h"
 #include "io/Console.h"
@@ -31,6 +32,10 @@ const Shell::Command Shell::gCommands[kNumCommands] = {
     },
     //  `hexdump`: read memory
     HexDump::GetCommandDescriptor(),
+    // `mr`: Read from memory
+    Memory::GetReadCommandDescriptor(),
+    // `mw`: Write to memory
+    Memory::GetWriteCommandDescriptor(),
     // `units`: Dump unit table
     Inventory::GetUnitsCommandDescriptor(),
     /**

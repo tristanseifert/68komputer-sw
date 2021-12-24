@@ -122,7 +122,7 @@ bool UnitTable::ParseUnitName(const char *name, Address &outAddress) {
         // otherwise copy it as is
         else {
             if(strOff == 7) return false;
-            typeStr[strOff++] = ch;
+            typeStr[strOff++] = toupper(ch);
             name++;
         }
     }

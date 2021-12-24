@@ -76,7 +76,7 @@ int XModemReceiver::receive(void *outBuf, const bool progress, const size_t outB
                         if(byte == static_cast<uint8_t>(Control::SOH)) {
                         } else if(byte == static_cast<uint8_t>(Control::EOT)) {
                             if(progress) {
-                                Console::Put("* Received EOT\r\n");
+                                Console::Put("\n* Received EOT\r\n");
                             }
                             this->state = State::AckEOT;
                             break;
@@ -91,7 +91,7 @@ int XModemReceiver::receive(void *outBuf, const bool progress, const size_t outB
                         // force cancelation of transfer
                         else if(byte == static_cast<uint8_t>(Control::CAN)) {
                             if(progress) {
-                                Console::Put("! Transfer aborted by remote end\r\n");
+                                Console::Put("\n! Transfer aborted by remote end\r\n");
 
                                 this->state = State::AckCAN;
                                 // XXX: this should be its own state transition
@@ -177,6 +177,11 @@ int XModemReceiver::receive(void *outBuf, const bool progress, const size_t outB
 
                 // ensure sufficient space and copy out payload
                 if(outBufBytes && outBufBytes < (this->fileOffset + Packet::kPayloadSize)) {
+                    if(progress) {
+                        Console::Print("! Insufficient buffer space (need %lu, have %lu)\r\n",
+                                (this->fileOffset + Packet::kPayloadSize), outBufBytes);
+                    }
+
                     // XXX: is this how we can abort the transfer?
                     this->remote->write(static_cast<uint8_t>(Control::CAN));
                     return ReceiveErrors::BufferOverflow;
@@ -186,6 +191,10 @@ int XModemReceiver::receive(void *outBuf, const bool progress, const size_t outB
                 memcpy(reinterpret_cast<uint8_t *>(outBuf) + this->fileOffset, packet.payload,
                         Packet::kPayloadSize);
                 this->fileOffset += Packet::kPayloadSize;
+
+                if(progress) {
+                    Console::Print("* %lu/%lu bytes\r", this->fileOffset, outBufBytes);
+                }
 
                 // reset the packet receive state for the next packet
                 this->retryCounter = kNumRetries;
