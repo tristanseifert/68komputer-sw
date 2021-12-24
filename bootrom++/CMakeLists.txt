@@ -114,12 +114,14 @@ add_executable(bootrom
     src/vector/ll_handlers.asm
     src/io/UnitTable.cpp
     src/io/Console.cpp
+    src/io/XModemReceiver.cpp
     src/svc/SvcTable.cpp
     src/hw/init.cpp
     src/hw/xr68c681/Xr68c681.cpp
     src/hw/xr68c681/isr.asm
     src/shell/Shell.cpp
     src/shell/CommandList.cpp
+    src/shell/Download.cpp
     src/shell/HexDump.cpp
     src/shell/Inventory.cpp
 )

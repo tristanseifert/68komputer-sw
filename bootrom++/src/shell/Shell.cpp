@@ -31,6 +31,7 @@ Shell::PromptReturn Shell::RunPrompt(const bool showErrors) {
     if(!ReadLine()) {
         return PromptReturn::ReadLineFailed;
     }
+    Console::Put("\r");
 
     if(!ParseLine()) {
         if(showErrors) {
@@ -64,6 +65,11 @@ bool Shell::ReadLine() {
                 case 0x0A:
                     gCurrentLine[gCurrentLineIndex] = '\0';
                     return true;
+                // backspace
+                case 0x08:
+                    gCurrentLine[--gCurrentLineIndex] = '\0';
+                    Console::Put(" \b");
+                    break;
 
                 // regular char
                 default:

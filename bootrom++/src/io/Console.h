@@ -43,6 +43,15 @@ class Console {
         }
 
         /**
+         * Get the character device being used for console IO.
+         *
+         * @return Current character device
+         */
+        static auto GetDevice() {
+            return gOutputDevice;
+        }
+
+        /**
          * Sets a character device to be used for all console IO.
          *
          * @param newDevice New character device

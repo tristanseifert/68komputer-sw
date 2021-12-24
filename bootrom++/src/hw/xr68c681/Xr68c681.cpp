@@ -63,10 +63,6 @@ const Xr68C681::RegInfo Xr68C681::gInitRegisters[kNumInitRegisters] = {
     MakeRegister(Reg::OPCR, 0b00000000),
     MakeRegister(Reg::COPBC, 0b11111100),
     MakeRegister(Reg::SOPBC, 0b00000100),
-
-    // configure interrupts
-//    MakeRegister(Reg::IVR, kIrqVector),
-//    MakeRegister(Reg::IMR, 0b00001000),
 };
 
 const driver_info_t Xr68C681::gDriverInfo {
@@ -91,6 +87,9 @@ Xr68C681::Xr68C681(volatile void *base, const uint8_t vector) :
     if(vector) {
         this->irqSupported = true;
         *REG(IVR) = vector;
+
+        // enable the timer irq
+        *REG(IMR) = 0b00001000;
     }
 
     // register devices
