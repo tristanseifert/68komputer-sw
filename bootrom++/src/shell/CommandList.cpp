@@ -19,6 +19,8 @@ using namespace shellcmd;
 const Shell::Command Shell::gCommands[kNumCommands] = {
     // `download`: Receive data via ZMODEM from a serial port
     Download::GetCommandDescriptor(),
+    // `exec`: Jump to user code
+    Execute::GetExecCommandDescriptor(),
     /**
      * Help: Prints all commands known to the shell out on the terminal. If an argument is
      * specified, we assume that's the name of a command to print detailed help for.

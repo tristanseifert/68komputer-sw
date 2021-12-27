@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+using namespace shellcmd;
+
 extern "C" {
 // helper methods defined in Execute.asm; it uses a custom register calling convention
 extern void shell_exec_handler();
@@ -15,7 +17,28 @@ extern void shell_exec_reset();
 extern uint16_t bootflag;
 }
 
-using namespace shellcmd;
+/**
+ * Jumps to the user code loaded at the specified address.
+ */
+int Execute::HandleExec(const char *command, char *params) {
+    char *addrStr;
+
+    if(!params || !(addrStr = strtok(params, " "))) {
+        Console::Print("%s: %s\r\n", command, "invalid parameters");
+        return -1;
+    }
+
+    const auto addr = reinterpret_cast<void *>(strtoul(addrStr, nullptr, 16));
+
+    // do a nasty hack to simulate a regparam function call
+    asm volatile(R"(
+    mov.l       %0, %d0
+    jmp         shell_exec_handler
+    )" : /* no outputs */ : "g"(addr) : "d0");
+
+    // shut up compiler; we return under error conditions so it can't be noreturn
+    return 0;
+}
 
 /**
  * Simulates a hardware reset. If a parameter is specified, it should be the word `cold` and we'll

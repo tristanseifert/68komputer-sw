@@ -77,7 +77,7 @@ class Shell {
         /**
          * Total number of commands registered with the shell.
          */
-        constexpr static const size_t kNumCommands{8};
+        constexpr static const size_t kNumCommands{9};
         /**
          * All commands known to the shell. On every command invocation, we'll search through this
          * list to find a matching handler.

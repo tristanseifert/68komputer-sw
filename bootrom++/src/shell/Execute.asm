@@ -24,6 +24,8 @@ shell_exec_handler:
     pea         ExecReturnHandler
 
     ; set up an exception frame to return to the user code
+    move.l      d0, -(sp)
+    move.w      #$2000, -(sp) ; supervisor mode, enable all interrupts
 
     ; clear registers
     moveq       #0, d0
@@ -54,5 +56,6 @@ shell_exec_reset:
 ;; Helper method that sets up the reset reason and jumps to the initialization code when a user
 ;; exec routine returns.
 ExecReturnHandler:
+    ; do fake reset
     move.b      #2, (resetreason).w
     bra         rominit

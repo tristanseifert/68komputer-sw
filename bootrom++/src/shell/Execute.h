@@ -3,6 +3,9 @@
 #include "Shell.h"
 
 namespace shellcmd {
+/**
+ * Commands for executing user code or resetting the system
+ */
 class Execute {
     public:
         /// Command descriptor for returning to a program
