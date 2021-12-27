@@ -125,6 +125,8 @@ add_executable(bootrom
     src/shell/HexDump.cpp
     src/shell/Inventory.cpp
     src/shell/Memory.cpp
+    src/shell/Execute.cpp
+    src/shell/Execute.asm
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)

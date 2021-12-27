@@ -7,18 +7,26 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 .section code,code
     public romentry
+    public rominit
+    public _stack_ptr
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 romentry:
+    ; disable irq's and ensure stack is set up correctly: this is the case on hardware resets but
+    ; if code jumps here to do a soft reset, it may not be the case so best to just fix it
+    ; ourselves now
     move        #$2700, sr
+    move.l      #_stack_ptr, sp
 
     ; determine if this is a warm or cold reset
     cmp.w       #'YE', (bootflag).w
     bne.s       .cold
 
 .warm:
+    ; set reset reason flag and continue to common initialization
     move.b      #1, (resetreason).w
-    bra.s       .common
+    bra.s       rominit
+
 
 .cold:
     ; reset external devices
@@ -40,14 +48,13 @@ romentry:
     move.w      #'YE', (bootflag).w
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-.common:
+rominit:
     ; copy .data to RAM
     lea         __data_rom_start, a0
     lea         __data_ram_start, a1
     move.l      #__data_rom_dwords, d0
-    ; -1 = there's no data to copy
-    cmp.w       #-1, d0
-    beq.s       .nodata
+    ; negative values = there's no data to copy
+    bmi.s       .nodata
 
 .copydata:
     move.l      (a0)+, (a1)+
@@ -57,9 +64,8 @@ romentry:
     ; clear .bss
     lea         __bss_start, a0
     move.l      #__bss_dwords, d0
-    ; -1 = there's no bss to clear
-    cmp.w       #-1, d0
-    beq.s       .nobss
+    ; negative values = there's no data to copy
+    bmi.s       .nobss
 
     moveq       #0, d1
 
@@ -73,11 +79,10 @@ romentry:
 
     ; run main function; it shouldn't ever return, but if it does, just reset
     bsr         bootrom_start
-    bra         .warm
+    bra         romentry
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-.section bss,bss
     ; used to differentiate a warm vs cold boot
-    comm bootflag, 2
+    public bootflag
     ; indicates why were rebooted: 0 = cold boot, 1 = warm reset
-    comm resetreason, 1
+    public resetreason

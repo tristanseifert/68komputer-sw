@@ -50,6 +50,14 @@ SECTIONS {
         . = ALIGN(4);
         /* end of .bss in RAM */
         __bss_end = .;
+
+        /* some variables shouldn't be cleared */
+        . += 4;
+        . = ALIGN(4);
+        *(.bssnoclr .bssnoclr.*)
+
+        /* align to 4 bytes to be nice */
+        . = ALIGN(4);
     } > RAM
     /* total bytes of .bss in RAM to clear */
     PROVIDE(__bss_size = __bss_end - __bss_start);
