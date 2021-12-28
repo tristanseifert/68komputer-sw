@@ -15,6 +15,7 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len);
 void *memset(void *dst, int c, size_t length);
 
 char *strchr(const char *p, int ch);
+size_t strlen(const char *str);
 
 char *strncat(char *dst, const char *src, size_t n);
 int strncmp(const char *s1, const char *s2, size_t n);

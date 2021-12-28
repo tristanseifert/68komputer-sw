@@ -5,6 +5,7 @@
 #include "HexDump.h"
 #include "Inventory.h"
 #include "Memory.h"
+#include "Register.h"
 
 #include "runtime/version.h"
 #include "io/Console.h"
@@ -39,6 +40,8 @@ const Shell::Command Shell::gCommands[kNumCommands] = {
     Memory::GetReadCommandDescriptor(),
     // `mw`: Write to memory
     Memory::GetWriteCommandDescriptor(),
+    // `reg`: Read or write register state
+    Register::GetCommandDescriptor(),
     // `reset`: Reset the system
     Execute::GetResetCommandDescriptor(),
     // `units`: Dump unit table

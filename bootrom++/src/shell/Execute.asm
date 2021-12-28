@@ -2,6 +2,7 @@
 ;; Helper methods for setting up a stack frame on return to a program.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     public resetreason
+    public _ZN8shellcmd8Register11gReturnRegsE
     public _stack_ptr
 
     public rominit
@@ -56,6 +57,11 @@ shell_exec_reset:
 ;; Helper method that sets up the reset reason and jumps to the initialization code when a user
 ;; exec routine returns.
 ExecReturnHandler:
+    ; save current registers
+    movem.l     d0-d7/a0-a7, (_ZN8shellcmd8Register11gReturnRegsE).w
+    clr.l       (_ZN8shellcmd8Register11gReturnRegsE+(4*16)).w
+    move.w      sr, (_ZN8shellcmd8Register11gReturnRegsE+(4*17)).w
+
     ; do fake reset
     move.b      #2, (resetreason).w
     bra         rominit

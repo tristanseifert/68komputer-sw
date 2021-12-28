@@ -77,6 +77,7 @@ add_library(runtime STATIC
     src/runtime/string/memmove.c
     src/runtime/string/memset.c
     src/runtime/string/strchr.c
+    src/runtime/string/strlen.c
     src/runtime/string/strncat.c
     src/runtime/string/strncmp.c
     src/runtime/string/strncpy.c
@@ -127,6 +128,7 @@ add_executable(bootrom
     src/shell/Memory.cpp
     src/shell/Execute.cpp
     src/shell/Execute.asm
+    src/shell/Register.cpp
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
