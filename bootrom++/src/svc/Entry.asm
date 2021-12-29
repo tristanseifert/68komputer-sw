@@ -1,0 +1,83 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Trap service dispatcher
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.section code,code
+    public isr_rom_svc_traphouse
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Entry point for the ROM services dispatcher (TRAP #15)
+;
+; Based on the function number in d0.w, it will invoke the correct handler function. This means the
+; high word of d0 can be used for arguments. d0 and a0 are always clobbered, but other registers
+; should be intact otherwise unless specified.
+;
+; @remarkTrap numbers always go in steps of 2 since the trap dispatch table is word wide. These
+; trap handlers must terminate with `rte` _and_ set the status code/return value in d0.
+isr_rom_svc_traphouse:
+    ; ensure it's in bounds
+    cmp.w       #(SvcJumpTableEnd-SvcJumpTable), d0
+    bge.s       .invalidSvc
+
+    ; then dispatch it
+    bclr        #0, d0
+
+    move.w      SvcJumpTable(pc, d0.w), d0
+    jmp         SvcJumpTable(pc, d0.w)
+
+; Service number is out of bounds
+.invalidSvc:
+    moveq       #-2, d0
+    rte
+
+SvcJumpTable:
+    dc.w        SvcNoOp-SvcJumpTable
+    dc.w        SvcTtyPuts-SvcJumpTable
+SvcJumpTableEnd:
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Secretes the instructions for ending a service call.
+;
+; Currently, this is just an rte but making it a macro means we can extend this later much easier.
+
+    macro SvcExit
+    rte
+    endm
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; $00: No op
+;
+; Inputs:
+;       None
+;
+; Outputs:
+;       d0.w: 0
+SvcNoOp:
+    moveq       #0, d0
+    SvcExit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; $02: Output zero terminated string on terminal
+;
+; Given a zero terminate (C style) string, output it to the currently active terminal.
+;
+; Inputs:
+;       a0: Pointer to start of string to output (must be 0 terminated)
+;
+; Outputs:
+;       d0.l: Number of characters written, or a negative error code
+;
+    global _ZN7Console3PutEPKc
+
+SvcTtyPuts:
+    movem.l     d1-d7/a1-a6, -(sp)
+
+    link        fp, #-4
+    move.l      a0, -(sp)
+    bsr         _ZN7Console3PutEPKc
+    unlk        fp
+
+    ; TODO: chars written?
+    moveq       #0, d0
+
+    movem.l     (sp)+, d1-d7/a1-a6
+    SvcExit

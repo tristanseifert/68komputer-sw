@@ -15,7 +15,7 @@ isr_reserved_\1:
     public isr_zero_divide, isr_chk, isr_trapv, isr_privilege_violation
     public isr_trace, isr_line1010, isr_line1111
     public isr_irq_uninitialized, isr_irq_spurious, isr_irq_unhandled_avec1
-    public isr_irq_unhandled_avec2, isr_irq_unhandled_avec3, isr_rom_svc_trap
+    public isr_irq_unhandled_avec2, isr_irq_unhandled_avec3
 
 ; a reserved vector was triggered (should never happen)
 isr_reserved:
@@ -98,14 +98,6 @@ isr_irq_unhandled_avec2:
     rte
 ; A level 3 autovector irq was received
 isr_irq_unhandled_avec3:
-    rte
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Entry point for the ROM services dispatcher (TRAP #15)
-;
-; Based on the function number in d0.w, it will invoke the correct handler function.
-isr_rom_svc_trap:
-    moveq       #-1, d0
     rte
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

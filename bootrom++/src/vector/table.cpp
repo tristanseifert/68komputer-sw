@@ -52,7 +52,7 @@ const __attribute__((section(".vectors"))) void *Vectors::gVectorTable[Vectors::
     &gTrampolines[TrampolineIndex::Trap12], &gTrampolines[TrampolineIndex::Trap13],
     &gTrampolines[TrampolineIndex::Trap14],
 
-    reinterpret_cast<void *>(&isr_rom_svc_trap),
+    reinterpret_cast<void *>(&isr_rom_svc_traphouse),
 
     /* vectors $30 - $3F are unassigned/reserved */
     reinterpret_cast<void *>(&isr_reserved), reinterpret_cast<void *>(&isr_reserved),

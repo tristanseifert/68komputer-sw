@@ -129,6 +129,7 @@ add_executable(bootrom
     src/shell/Execute.cpp
     src/shell/Execute.asm
     src/shell/Register.cpp
+    src/svc/Entry.asm
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
