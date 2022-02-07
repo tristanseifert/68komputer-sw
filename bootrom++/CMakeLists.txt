@@ -25,6 +25,9 @@ include(GenerateExportHeader)
 find_package (Python3 COMPONENTS Interpreter REQUIRED)
 set(BIN2HDR_PATH "${CMAKE_CURRENT_LIST_DIR}/tools/bin2hdr.py")
 
+### Find other tools
+find_program(LZ4_PROGRAM lz4 REQUIRED)
+
 ### Force C and C++ standards, warnings
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
@@ -135,6 +138,9 @@ add_executable(bootrom
     src/shell/Register.cpp
     src/shell/RomApps.cpp
     src/svc/Entry.asm
+    src/util/Compression.cpp
+    src/util/Lz4Frame.asm
+    src/util/Lz4.asm
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)

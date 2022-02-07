@@ -35,6 +35,7 @@ SvcJumpTable:
     dc.w        SvcTtyPutch-SvcJumpTable
     dc.w        SvcTtyGetch-SvcJumpTable
     dc.w        SvcExitToMonitor-SvcJumpTable
+    dc.w        SvcLz4Depack-SvcJumpTable
 SvcJumpTableEnd:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -139,6 +140,27 @@ SvcTtyGetch:
 ;
 ; Outputs:
 ;       None
+    global      ExecReturnHandler
 
 SvcExitToMonitor:
     bra.w       ExecReturnHandler
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; $0A: Decompress LZ4 frame
+;
+; Inputs:
+;       a0: LZ4 frame to decompress
+;       a1: Memory area to decompress data to
+;
+; Outputs:
+;       None
+    global      lz4_frame_depack
+
+SvcLz4Depack:
+    movem.l     d1-d5/d7/a2-a4, -(sp)
+
+    bsr         lz4_frame_depack
+
+    movem.l     (sp)+, d1-d5/d7/a2-a4
+    SvcExit
+

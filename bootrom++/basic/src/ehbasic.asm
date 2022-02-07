@@ -74,8 +74,18 @@ nobrk		EQU	0				; null response to INPUT causes a break
     org             $F00000
     section code,code
 
-; for convenience, start from the first instruction
-    BRA.w    code_start
+; build the app header structure
+AppHeader:
+    ; magic
+    dc.l        $41505045
+    ; header version and length
+    dc.w        $0100, $14
+    ; app length
+    dc.l        End-AppHeader
+    ; Name offset
+    dc.l        Msg_Version-AppHeader
+    ; entry point offset
+    dc.l        code_start-AppHeader
 
 *************************************************************************************
 *
@@ -257,6 +267,9 @@ LAB_sizok
 
 	BSR		LAB_295E			; print d0 as unsigned integer (bytes free)
 	LEA		LAB_SMSG(pc),a0		; point to start message
+	BSR		LAB_18C3			; print null terminated string from memory
+	
+        LEA		LAB_SMSG2(pc),a0		; point to start message
 	BSR		LAB_18C3			; print null terminated string from memory
 
 	LEA		LAB_RSED(pc),a0		; get pointer to value
@@ -9029,7 +9042,14 @@ LAB_RMSG
 	dc.b	$0D,$0A,'Ready',$0D,$0A,$00
 LAB_SMSG
 	dc.b	' Bytes free',$0D,$0A,$0A
-	dc.b	'Enhanced 68k BASIC Version 3.54',$0D,$0A,$00
+
+Msg_Version:
+	dc.b	'Enhanced 68k BASIC Version 3.54', $00
+
+; second start message (with endline)
+LAB_SMSG2:
+        dc.b    $D, $a, 0
+        even
 
 
 *************************************************************************************
@@ -9182,6 +9202,7 @@ LAB_SMSG
 
 *************************************************************************************
 
+End:
 	END	code_start
 
 *************************************************************************************
