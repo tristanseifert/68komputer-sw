@@ -34,7 +34,7 @@ int Execute::HandleExec(const char *command, char *params) {
     const auto addr = reinterpret_cast<volatile void *>(strtoul(addrStr, nullptr, 16));
 
     asm volatile(R"(
-    mov.l       %0, %d0
+    mov.l       %0, %%d0
     jmp         shell_exec_handler
     )" : /* no outputs */ : "g"(addr) : "d0");
 

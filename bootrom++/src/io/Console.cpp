@@ -13,6 +13,15 @@ void _putchar(char ch) {
     Console::Put(ch);
 }
 
+/**
+ * Read a character, if any are pending.
+ */
+int Console::GetCharWrapper() {
+    if(!GetCharPending()) return -1;
+    return GetChar();
+}
+
+
 
 
 /**

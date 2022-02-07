@@ -67,6 +67,12 @@ bool Shell::ReadLine() {
                     return true;
                 // backspace
                 case 0x08:
+                    // no more characters to erase
+                    if(!gCurrentLineIndex) {
+                        Console::Put(" \a");
+                        break;
+                    }
+                    // erase character
                     gCurrentLine[--gCurrentLineIndex] = '\0';
                     Console::Put(" \b");
                     break;

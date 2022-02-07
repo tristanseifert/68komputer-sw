@@ -34,7 +34,8 @@ class Memory {
                 .shortHelp = "Poke at memory",
                 .longHelp = "Write data to an arbitrary memory location.\r\n\n"
                     " - \x1b[1mmb\x1b[0m [size] [address] [data]: Write to a single memory address.\r\n\n"
-                    "Size can be one of {b,w,l} or {1,2,4}. Address and data are specified in hexadecimal.\r\n",
+                    "Size can be one of {b,w,l} or {1,2,4}. Address and data are specified in\r\n"
+                    "hexadecimal.\r\n",
                 .handler = HandleWrite,
             };
         }

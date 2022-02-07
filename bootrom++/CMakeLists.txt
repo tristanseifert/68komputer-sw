@@ -21,6 +21,10 @@ include(ExternalProject)
 include(FetchContent)
 include(GenerateExportHeader)
 
+### find Python interpreter (for the bin -> hex script)
+find_package (Python3 COMPONENTS Interpreter REQUIRED)
+set(BIN2HDR_PATH "${CMAKE_CURRENT_LIST_DIR}/tools/bin2hdr.py")
+
 ### Force C and C++ standards, warnings
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
@@ -129,13 +133,21 @@ add_executable(bootrom
     src/shell/Execute.cpp
     src/shell/Execute.asm
     src/shell/Register.cpp
+    src/shell/RomApps.cpp
     src/svc/Entry.asm
 )
 target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/include)
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_link_libraries(bootrom PRIVATE printf runtime)
 target_compile_options(bootrom PRIVATE -fno-exceptions)
-target_link_options(bootrom PRIVATE -static -nostdlib )
+target_link_options(bootrom PRIVATE -static -nostdlib)
+
+# include various ROM apps
+add_library(RomApps INTERFACE)
+
+add_subdirectory(basic)
+
+target_link_libraries(bootrom PRIVATE RomApps)
 
 # we have to use a custom linker script
 target_link_options(bootrom PRIVATE "-T${CMAKE_CURRENT_LIST_DIR}/bootrom.ld")

@@ -21,6 +21,8 @@ class Console {
         static void Put(const char *);
         static int Print(const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 
+        static int GetCharWrapper();
+
         /**
          * Check if there are characters pending to be read from the console.
          *

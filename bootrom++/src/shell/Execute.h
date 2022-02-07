@@ -15,7 +15,7 @@ class Execute {
                 .shortHelp = "Execute a program",
                 .longHelp = "Set up a stack frame to return to the code at the given address.\r\n\n"
                     " - \x1b[1mexec\x1b[0m [address]: Begin executing code at address\r\n\n"
-                    "Address is specified in hexadecimal. The command will set up a clean stack frame.\r\n",
+                    "Address is specified in hexadecimal. The command sets up a clean stack frame.\r\n",
                 .handler = HandleExec,
             };
         }

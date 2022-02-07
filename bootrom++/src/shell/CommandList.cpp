@@ -6,6 +6,7 @@
 #include "Inventory.h"
 #include "Memory.h"
 #include "Register.h"
+#include "RomApps.h"
 
 #include "runtime/version.h"
 #include "io/Console.h"
@@ -18,6 +19,8 @@ using namespace shellcmd;
  * @remark This list should be kept alphabetically ordered.
  */
 const Shell::Command Shell::gCommands[kNumCommands] = {
+    // `basic`: Launch BASIC interpreter
+    RomApps::GetBasicCommandDescriptor(),
     // `download`: Receive data via ZMODEM from a serial port
     Download::GetCommandDescriptor(),
     // `exec`: Jump to user code
@@ -56,7 +59,7 @@ const Shell::Command Shell::gCommands[kNumCommands] = {
         .handler = [](auto, auto) -> int {
             Console::Print("68komputer Boot ROM version %s (build %s)\r\n", gVersionShort,
                     gVersionCommit);
-            Console::Put("Copyright 2019-2021: Tristan Seifert\r\n\n");
+            Console::Put("Copyright 2019-2022: Tristan Seifert\r\n\n");
             Console::Put("Compiled on: " __DATE__ " at " __TIME__ "\r\n");
             return 0;
         }
