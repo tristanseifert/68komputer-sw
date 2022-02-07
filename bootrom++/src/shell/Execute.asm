@@ -62,6 +62,8 @@ ExecReturnHandler:
     clr.l       (_ZN8shellcmd8Register11gReturnRegsE+(4*16)).w
     move.w      sr, (_ZN8shellcmd8Register11gReturnRegsE+(4*17)).w
 
+    ; XXX: clear console receive buffers
+
     ; do fake reset
     move.b      #2, (resetreason).w
     bra         rominit

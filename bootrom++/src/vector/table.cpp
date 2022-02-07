@@ -52,6 +52,7 @@ const __attribute__((section(".vectors"))) void *Vectors::gVectorTable[Vectors::
     &gTrampolines[TrampolineIndex::Trap12], &gTrampolines[TrampolineIndex::Trap13],
     &gTrampolines[TrampolineIndex::Trap14],
 
+    /* XXX: trap 15 is used by easy68k, so allow it open for user use */
     reinterpret_cast<void *>(&isr_rom_svc_traphouse),
 
     /* vectors $30 - $3F are unassigned/reserved */

@@ -135,7 +135,7 @@ target_include_directories(bootrom PRIVATE SYSTEM ${CMAKE_CURRENT_LIST_DIR}/incl
 target_include_directories(bootrom PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 target_link_libraries(bootrom PRIVATE printf runtime)
 target_compile_options(bootrom PRIVATE -fno-exceptions)
-target_link_options(bootrom PRIVATE -static -nostdlib -nostartfiles)
+target_link_options(bootrom PRIVATE -static -nostdlib )
 
 # we have to use a custom linker script
 target_link_options(bootrom PRIVATE "-T${CMAKE_CURRENT_LIST_DIR}/bootrom.ld")

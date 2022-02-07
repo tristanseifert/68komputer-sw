@@ -143,9 +143,10 @@ bool Shell::FindCommandDescriptor(const char *name, const Command **outCmd) {
 
     // TODO: we could optimize this if the command list is sorted
     for(size_t i = 0; i < kNumCommands; i++) {
-          const auto &h = gCommands[i];
+        const auto &h = gCommands[i];
+        const auto hLen = strlen(h.name);
 
-        if(!strncmp(name, h.name, commandLen)) {
+        if(commandLen >= hLen && !memcmp(h.name, name, hLen)) {
             *outCmd = &h;
             return true;
         }
