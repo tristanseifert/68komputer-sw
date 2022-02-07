@@ -32,6 +32,9 @@ isr_rom_svc_traphouse:
 SvcJumpTable:
     dc.w        SvcNoOp-SvcJumpTable
     dc.w        SvcTtyPuts-SvcJumpTable
+    dc.w        SvcTtyPutch-SvcJumpTable
+    dc.w        SvcTtyGetch-SvcJumpTable
+    dc.w        SvcExitToMonitor-SvcJumpTable
 SvcJumpTableEnd:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -81,3 +84,61 @@ SvcTtyPuts:
 
     movem.l     (sp)+, d1-d7/a1-a6
     SvcExit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; $04: Output a character to the terminal.
+;
+; Inputs:
+;       d1.b: Byte to write to the terminal
+;
+; Outputs:
+;       None
+;
+    global      _putchar
+
+SvcTtyPutch:
+    movem.l     d1-d7/a0-a6, -(sp)
+
+    link        fp, #-4
+    move.l      d1, -(sp)
+    bsr         _putchar
+    unlk        fp
+
+    ; TODO: error code?
+    moveq       #0, d0
+
+    movem.l     (sp)+, d1-d7/a0-a6
+    SvcExit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; $06: Read a character from the terminal.
+;
+; Inputs:
+;       None
+;
+; Outputs:
+;       d0.l: The byte read from the terminal, or -1 if no characters are pending.
+;
+    global      _ZN7Console14GetCharWrapperEv
+
+SvcTtyGetch:
+    movem.l     d1-d7/a0-a6, -(sp)
+
+    link        fp, #0
+    bsr         _ZN7Console14GetCharWrapperEv
+    unlk        fp
+
+    movem.l     (sp)+, d1-d7/a0-a6
+    SvcExit
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; $08: Return to monitor
+;
+; Inputs:
+;       None
+;
+; Outputs:
+;       None
+
+SvcExitToMonitor:
+    bra.w       ExecReturnHandler

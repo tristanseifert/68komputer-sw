@@ -56,6 +56,8 @@ shell_exec_reset:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helper method that sets up the reset reason and jumps to the initialization code when a user
 ;; exec routine returns.
+    global ExecReturnHandler
+
 ExecReturnHandler:
     ; save current registers
     movem.l     d0-d7/a0-a7, (_ZN8shellcmd8Register11gReturnRegsE).w
