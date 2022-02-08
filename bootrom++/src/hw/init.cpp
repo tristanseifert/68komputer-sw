@@ -31,5 +31,17 @@ void hw_init() {
     auto duart = new (reinterpret_cast<Xr68C681 *>(gDuartBuffer)) Xr68C681(
             reinterpret_cast<volatile void *>(0x130001), 0xF0);
     Console::SetDevice(duart->getPortA());
+
+    // reset terminal
+    constexpr static const char kReset[]{
+        // reset terminal attributes
+        0x1b, '[', '0', 'm',
+        // set ASCII character set for set 0
+        0x1b, '(', 'B',
+        // set DEC special graphics for set 1
+        0x1b, ')', '0', 0
+    };
+
+    Console::Put(kReset);
 }
 

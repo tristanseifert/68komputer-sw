@@ -64,6 +64,12 @@ int RomApps::LaunchApp(const AppHeader &hdr) {
 
     Console::Print("Launching %s (at $%p)\r\n", appName ? appName : "app", entryAddr);
 
+    Console::Put(0xe);
+    for(uint8_t i = 0; i < 80; i++) {
+        Console::Put('p');
+    }
+    Console::Put("\x0f\r\n");
+
     asm volatile(R"(
     mov.l       %0, %%d0
     jmp         shell_exec_handler

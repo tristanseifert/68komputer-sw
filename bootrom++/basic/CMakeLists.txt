@@ -1,28 +1,23 @@
 # build the Enhanced BASIC ROM
-add_custom_target(ehbasic
-    COMMAND vasmm68k_mot -Fbin -m68000 -esc -spaces -o ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin ${CMAKE_CURRENT_SOURCE_DIR}/src/ehbasic.asm
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ehbasic.asm
-    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin
-    COMMENT "Building Enhanced BASIC"
-)
-
-# compress the BASIC ROM
-add_custom_command(TARGET ehbasic POST_BUILD
+add_custom_command(OUTPUT romapp_basic.c
+    # assemble it
+    # we disable warning 2028 (using signed operand as unsigned, moveq overflow) since the ehbasic
+    # code uses it in a few places, seemingly intentionally
+    COMMAND vasmm68k_mot -Fbin -m68000 -esc -spaces -nowarn=2028 -L ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.lst -o ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin ${CMAKE_CURRENT_SOURCE_DIR}/src/ehbasic.asm
+    # compress it
     COMMAND ${LZ4_PROGRAM} -z -12 -f --no-frame-crc ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin.lz4
-    COMMENT "Compressing Enhanced BASIC"
+    # convert to header
+    COMMAND ${Python3_EXECUTABLE} ${BIN2HDR_PATH} --const ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin.lz4 romapp_basic
+    # rebuild when basic source or tool source changes
+    DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/ehbasic.asm ${BIN2HDR_PATH}
+    # secrete raw and compressed binary
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin ${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin.lz4 romapp_basic.h
+    COMMENT "Building Enhanced BASIC"
+    VERBATIM
 )
 
-# convert the binary to a C header
-set(INPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/ehbasic.bin.lz4")
-set(OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/romapp_basic.h")
+add_library(RomAppBasic STATIC
+    romapp_basic.c
+)
+target_include_directories(RomAppBasic PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-add_custom_command(TARGET ehbasic POST_BUILD
-    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-    COMMAND ${Python3_EXECUTABLE} ${BIN2HDR_PATH} --const ${INPUT_FILE} ${OUTPUT_FILE}
-    DEPENDS ${BIN2HDR_PATH} ${INPUT_FILE}
-    COMMENT "Creating C header for Enhanced BASIC")
-
-target_sources(RomApps INTERFACE ${OUTPUT_FILE})
-target_include_directories(RomApps INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
-
-add_dependencies(RomApps ehbasic ${INPUT_FILE} ${OUTPUT_FILE})

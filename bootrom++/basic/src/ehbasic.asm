@@ -146,20 +146,14 @@ VEC_SV
 
 ; message indicating there's insufficient RAM
 msg_noram:
-    dc.b "Insufficient RAM to start BASIC!\r\n", 0
+    dc.b "16K RAM required!", $d, $a, 0
     even
 
-code_start
+code_start:
     ;; TODO: reset UART
-
-* to tell EhBASIC where and how much RAM it has pass the address in a0 and the size
-* in d0. these values are at the end of the .inc file
-
+    ; tell the interpreter how much RAM we have (d0, bytes) and where it starts (a0)
 	MOVEA.l	#ram_addr,a0		; tell BASIC where RAM starts
 	MOVE.l	#ram_size,d0		; tell BASIC how big RAM is
-
-* end of simulator specific code
-
 
 ****************************************************************************************
 ****************************************************************************************
@@ -185,8 +179,6 @@ LAB_COLD
     BGE.s		LAB_sizok			; branch if >= 16k
 
     ; TODO: insufficient RAM message
-    nop
-
     moveq   #2, d0
     lea     msg_noram(pc), a0
     trap    #15
@@ -261,7 +253,10 @@ LAB_sizok
 	MOVE.l	a0,Smeml(a3)		; save start of mem
 
 	BSR		LAB_1463			; do "NEW" and "CLEAR"
-	BSR		LAB_CRLF			; print CR/LF
+
+	LEA		LAB_SMSG3(pc),a0		; point to start message
+	BSR		LAB_18C3			; print null terminated string from memory
+
 	MOVE.l	Ememl(a3),d0		; get end of mem
 	SUB.l		Smeml(a3),d0		; subtract start of mem
 
@@ -9041,7 +9036,7 @@ LAB_REDO
 LAB_RMSG
 	dc.b	$0D,$0A,'Ready',$0D,$0A,$00
 LAB_SMSG
-	dc.b	' Bytes free',$0D,$0A,$0A
+	dc.b	" bytes",$0D,$0A,$0A
 
 Msg_Version:
 	dc.b	'Enhanced 68k BASIC Version 3.54', $00
@@ -9049,8 +9044,11 @@ Msg_Version:
 ; second start message (with endline)
 LAB_SMSG2:
         dc.b    $D, $a, 0
-        even
 
+LAB_SMSG3:
+        dc.b    "Memory available: ", 0
+
+        even
 
 *************************************************************************************
 * EhBASIC keywords quick reference list								*

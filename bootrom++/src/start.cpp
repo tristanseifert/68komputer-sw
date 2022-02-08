@@ -30,6 +30,30 @@ static const char *const gResetReasonNames[kMaxResetReason] = {
 };
 
 /**
+ * Prints the sign-on banner.
+ *
+ * This is a box containing the monitor build info and reset reason.
+ */
+static void PrintBanner() {
+    constexpr static const uint8_t kBannerWidth{50};
+    Console::Put("\r\n \x0e\x6c");
+    for(uint8_t i = 0; i < kBannerWidth-2; i++) {
+        Console::Put(0x71);
+    }
+    Console::Put("\x6b\x0f\r\n");
+
+    Console::Print(" \x0e\x78\x0f 68komputer monitor, version %-18s \x0e\x78\x0f\r\n", gVersionShort);
+    Console::Print(" \x0e\x78\x0f Reset reason: %-32s \x0e\x78\x0f\r\n",
+            (resetreason < kMaxResetReason) ? gResetReasonNames[resetreason] : "unknown");
+
+    Console::Put(" \x0e\x6d");
+    for(uint8_t i = 0; i < kBannerWidth-2; i++) {
+        Console::Put(0x71);
+    }
+    Console::Put("\x6a\x0f\r\n");
+}
+
+/**
  * Entry point for the boot ROM
  *
  * This is where we'll check the hardware configuration in NVRAM and the DIP switches to figure
@@ -40,9 +64,7 @@ void bootrom_start() {
     Shell::Init();
 
     // TODO: check NVRAM, hardware, DIP switches
-    Console::Print("68komputer monitor (version %s)\r\n", gVersionShort);
-    Console::Print("Reset reason: %s\r\n",
-            (resetreason < kMaxResetReason) ? gResetReasonNames[resetreason] : "unknown");
+    PrintBanner();
 
     // enter the shell thingie
     for(;;) {
